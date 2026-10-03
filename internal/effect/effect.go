@@ -2,10 +2,12 @@ package effect
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/Nomadcxx/sysc-Go/animations"
 	"github.com/Nomadcxx/sysc-terminal/internal/cell"
+	"github.com/Nomadcxx/sysc-terminal/internal/ipc"
 )
 
 const (
@@ -19,12 +21,12 @@ type ticker interface {
 }
 
 type Effect struct {
-	id, theme string
-	w, h      int
-	paused    bool
-	gen       int
-	grid      *cell.Grid
-	fx        ticker
+	id, theme, text string
+	w, h            int
+	paused          bool
+	gen             int
+	grid            *cell.Grid
+	fx              ticker
 }
 
 func New(id, theme string, cols, rows int, text string) (*Effect, error) {
@@ -44,7 +46,18 @@ func New(id, theme string, cols, rows int, text string) (*Effect, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Effect{id: id, theme: theme, w: cols, h: rows, fx: fx}, nil
+	return &Effect{id: id, theme: theme, text: text, w: cols, h: rows, fx: fx}, nil
+}
+
+func NewFromFile(id, theme string, cols, rows int, path string) (*Effect, error) {
+	if err := ipc.CheckFile(path); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return New(id, theme, cols, rows, string(data))
 }
 
 func (e *Effect) Tick() {
@@ -64,6 +77,50 @@ func (e *Effect) Grid() *cell.Grid { return e.grid }
 func (e *Effect) Generation() int  { return e.gen }
 func (e *Effect) EffectWidth() int { return e.w }
 func (e *Effect) SetPaused(p bool) { e.paused = p }
+
+type textSetter interface {
+	SetText(string)
+}
+
+func (e *Effect) SetText(text string) error {
+	if e == nil {
+		return fmt.Errorf("nil effect")
+	}
+	s, ok := e.fx.(textSetter)
+	if !ok {
+		return fmt.Errorf("effect %q has no SetText", e.id)
+	}
+	s.SetText(text)
+	e.text = text
+	return nil
+}
+
+type resizer interface {
+	Resize(int, int)
+}
+
+func (e *Effect) Resize(cols, rows int) error {
+	if e == nil {
+		return fmt.Errorf("nil effect")
+	}
+	if cols < minCols {
+		cols = minCols
+	}
+	if rows < minRows {
+		rows = minRows
+	}
+	e.w, e.h = cols, rows
+	if r, ok := e.fx.(resizer); ok {
+		r.Resize(cols, rows)
+		return nil
+	}
+	fx, err := construct(e.id, e.theme, cols, rows, e.text)
+	if err != nil {
+		return err
+	}
+	e.fx = fx
+	return nil
+}
 
 func List() string {
 	var b strings.Builder
