@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/Nomadcxx/sysc-terminal/internal/wayland/layershell"
 )
@@ -47,5 +48,37 @@ func TestDisplayLossReturnsError(t *testing.T) {
 	err := HandleDisplayLost(errors.New("display gone"))
 	if err == nil {
 		t.Fatal("display loss returned nil; process would look healthy with a black output")
+	}
+}
+
+func TestPausedDoesNotRequestFrame(t *testing.T) {
+	if ShouldRequestFrame(true) {
+		t.Fatal("paused owner requested Surface.Frame; CPU cannot idle")
+	}
+}
+
+func TestResumeRequestsOneFrame(t *testing.T) {
+	if !ShouldRequestFrame(false) {
+		t.Fatal("resume dropped the frame callback chain")
+	}
+}
+
+func TestAdvanceThrottledUnder50ms(t *testing.T) {
+	last := time.Unix(1, 0)
+	if ShouldAdvance(last, last.Add(49*time.Millisecond)) {
+		t.Fatal("advanced a tick before 50ms")
+	}
+}
+
+func TestAdvanceAt50ms(t *testing.T) {
+	last := time.Unix(1, 0)
+	if !ShouldAdvance(last, last.Add(50*time.Millisecond)) {
+		t.Fatal("did not advance at the 50ms floor")
+	}
+}
+
+func TestResumeAdvancesFromZeroLast(t *testing.T) {
+	if !ShouldAdvance(time.Time{}, time.Unix(1, 0)) {
+		t.Fatal("resume with no prior tick did not advance")
 	}
 }

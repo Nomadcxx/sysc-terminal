@@ -2,6 +2,7 @@ package wayland
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Nomadcxx/sysc-terminal/internal/raster"
 	"github.com/Nomadcxx/sysc-terminal/internal/wayland/layershell"
@@ -36,4 +37,10 @@ func HandleDisplayLost(cause error) error {
 		cause = fmt.Errorf("wayland: display lost")
 	}
 	return fmt.Errorf("wayland: unmap and exit: %w", cause)
+}
+
+func ShouldRequestFrame(paused bool) bool { return !paused }
+
+func ShouldAdvance(last, now time.Time) bool {
+	return now.Sub(last) >= 50*time.Millisecond
 }
