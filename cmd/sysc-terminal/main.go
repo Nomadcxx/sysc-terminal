@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/Nomadcxx/sysc-terminal/internal/effect"
 )
 
 func main() {
@@ -14,8 +16,12 @@ func main() {
 
 func run(args []string) error {
 	for _, a := range args {
-		if a == "-h" || a == "-help" || a == "--help" {
+		switch a {
+		case "-h", "-help", "--help":
 			fmt.Fprint(os.Stdout, usage)
+			return nil
+		case "--list":
+			fmt.Fprint(os.Stdout, effect.List())
 			return nil
 		}
 	}
