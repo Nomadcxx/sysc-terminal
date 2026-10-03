@@ -24,7 +24,7 @@ type Effect struct {
 	id, theme, text string
 	w, h            int
 	paused          bool
-	gen             int
+	gen, renders    int
 	grid            *cell.Grid
 	fx              ticker
 }
@@ -65,7 +65,9 @@ func (e *Effect) Tick() {
 		return
 	}
 	e.fx.Update()
-	g, err := cell.Parse(e.fx.Render(), e.w, e.h)
+	frame := e.fx.Render()
+	e.renders++
+	g, err := cell.Parse(frame, e.w, e.h)
 	if err != nil {
 		return
 	}
@@ -75,6 +77,7 @@ func (e *Effect) Tick() {
 
 func (e *Effect) Grid() *cell.Grid { return e.grid }
 func (e *Effect) Generation() int  { return e.gen }
+func (e *Effect) RenderCount() int { return e.renders }
 func (e *Effect) EffectWidth() int { return e.w }
 func (e *Effect) SetPaused(p bool) { e.paused = p }
 

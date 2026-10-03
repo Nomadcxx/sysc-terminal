@@ -62,6 +62,23 @@ func TestPauseDoesNotAdvance(t *testing.T) {
 	}
 }
 
+func TestPausedTickDoesNotRender(t *testing.T) {
+	e, err := New("fire", "nord", 80, 24, "")
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	e.Tick()
+	n := e.RenderCount()
+	if n == 0 {
+		t.Fatal("tick did not count a render")
+	}
+	e.SetPaused(true)
+	e.Tick()
+	if got := e.RenderCount(); got != n {
+		t.Fatalf("paused tick rendered %d -> %d", n, got)
+	}
+}
+
 func TestListMatchesRegistry(t *testing.T) {
 	listed := map[string]bool{}
 	sc := bufio.NewScanner(strings.NewReader(List()))
