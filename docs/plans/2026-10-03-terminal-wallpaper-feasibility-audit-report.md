@@ -35,7 +35,7 @@ Existing worktrees and dirty files listed above were left untouched.
 
 - `Update()` — no dt, no frame index
 - `Render() string` — a full frame, not a cell buffer
-- `Reset()` — documented on the interface; **FireEffect and FireworksEffect do not implement it** (no `Reset` method in `fire.go` / `fireworks.go` in either checkout)
+- `Reset()` — documented on the interface; **FireEffect, FireTextEffect, and FireworksEffect do not implement it**
 
 Dimensions are character columns/rows (`Config.Width` / `Height`). `TextUpdatable.SetText` exists; `TestTextBasedEffectsSatisfyTextUpdatable` **measured** pass on `/home/nomadx/sysc-Go`.
 
@@ -166,6 +166,8 @@ From `2026-09-03-wallpaper-design.md` and current `internal/wallpaper`:
 - **D12–D18** gSlapper-first, shell-owned sockets, one process per connector, never `*`, never `pkill` by name, never kill foreign instances.
 - **D19** assignments JSON: `connector -> {kind: image|video, path, preview_path, desired_playback}`. Kind is only `KindImage` / `KindVideo` (`media.go:17-22`). `checkPath` rejects empty/newline/non-UTF-8 paths (`persist.go:59-69`). An effect encoded as a fake filename would fail kind detection and theme-seed write-back.
 - `EngineFor(kind)` returns gSlapper for any kind if installed (`service.go:69-77`). A third kind needs an explicit engine name, not a reused image path.
+- `Apply` `os.Stat`s the media path before launch (`engine.go:317-322`). A fake filename would fail there even if persist were loosened.
+- Background coverage treats only `slapper` / `awww-daemon` / `swaybg` / `sysc-shell*` as ours (`popout_wallpaper.go` `wallpaperOurNamespace`). A new namespace is foreign until listed.
 - Pause/Resume exist (`OpPause`/`OpResume`) and are **video-only** today (`service.go` comments; images have no pipeline).
 - Engine pills in the picker are a readout of installed backends (`popout_wallpaper.go:716-732`), not a second settings page.
 - Restore (`D16`) stops gSlapper and applies a still via awww/swaybg. That exception is for media, not for effects.

@@ -249,10 +249,10 @@ Then add table tests for the remaining v1.0.3 ids constructing + one Tick. One c
 - Modify: `internal/wallpaper/media.go` (add `KindEffect`)
 - Modify: `internal/wallpaper/persist.go`, `assign.go`, `service.go`, `engine.go`
 - Create: `internal/wallpaper/terminal.go` (launch argv, probe `--help` for `-I`)
-- Modify: `internal/shell/popout_wallpaper.go` (Effects source, pill)
+- Modify: `internal/shell/popout_wallpaper.go` (Effects source, pill, `wallpaperOurNamespace`)
 - Tests beside each
 
-**Step 1:** Persist round-trip of an effect assignment without a media path. `EngineFor(KindEffect)` is `sysc-terminal` iff probe passes. Apply stops owned gSlapper on that connector (existing retire path). Fake process in engine tests.
+**Step 1:** Persist round-trip of an effect assignment without a media path. `EngineFor(KindEffect)` is `sysc-terminal` iff probe passes. Apply does not `os.Stat` an empty path. `SetPaused` works for KindEffect. `wallpaperOurNamespace` includes `sysc-terminal`. Apply stops owned gSlapper on that connector (existing retire path). Fake process in engine tests.
 
 **Step 2:** FAIL on persist of unknown kind `effect`.
 

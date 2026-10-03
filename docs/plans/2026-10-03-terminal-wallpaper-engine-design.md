@@ -45,7 +45,7 @@ Per mapped output:
 | Size | 0×0 (compositor configures) |
 | Exclusive zone | 0 |
 | Keyboard | none |
-| Input region | empty `wl_region` |
+| Input region | empty `wl_region` (not nil: nil means the whole surface takes input) |
 | Coverage | the output's configured size; no exclusive reservation |
 
 Do not use Bottom (depth clock lives there, namespace
@@ -53,7 +53,14 @@ Do not use Bottom (depth clock lives there, namespace
 Keep text/assets upright: ignore output transform for glyph orientation; if
 Niri already applies transform to the buffer, follow shell's existing
 output-transform policy rather than inventing a second one. Confirm in the
-first live gate.
+first live gate. gSlapper ignores `wl_output` transform; we do the same until
+that gate says otherwise.
+
+Shell coverage: add `sysc-terminal` to `wallpaperOurNamespace` in
+`popout_wallpaper.go`. Without that, `Snapshot.Covered` treats this Background
+surface as foreign and the picker lies. Do not claim it via a `sysc-shell*`
+prefix on Background; the engine is a sibling process, not a shell aux
+surface.
 
 ### D4 — Cell grid from font metrics
 
@@ -86,6 +93,7 @@ FPS) while playing. A tick that finds the previous raster still in flight
 drops the new tick. Paused: stop the ticker, do not `Surface.Frame`, do not
 call `Update`/`Render`. Last buffer stays attached. Reset: if the concrete
 type has `Reset()`, call it; otherwise reconstruct the effect.
+`FireEffect`, `FireTextEffect`, and `FireworksEffect` have no `Reset`.
 
 ### D6 — Bounded ANSI subset
 
@@ -109,7 +117,10 @@ sysc-Go `cellstyle_test.go` is the semantic model (rune + active SGR).
 
 Unix socket path chosen by the parent (shell):
 `$XDG_RUNTIME_DIR/sysc-shell/terminal-<sanitized-connector>.sock`.
-Line-oriented, max 4 KiB per line, 2 s write/read deadline. Peer: same uid.
+Line-oriented, max 4 KiB per line, 2 s write/read deadline. Socket mode 0600.
+Peer: same uid via `SO_PEERCRED` (gSlapper master does not check credentials;
+we do, because the socket lives in the user's runtime dir and the shell
+already does this for gSlapper).
 Verbs:
 
 | Request | Ack |
@@ -148,11 +159,21 @@ connector -> {
 `EngineFor(KindEffect)` returns `"sysc-terminal"` if the binary probes
 successfully (`sysc-terminal --help` contains `--ipc-socket` or `-I`), else
 `""` and the picker shows an unavailable banner; image/video keep working.
+`Apply` for `KindEffect` must not `os.Stat` a media path (today's image/video
+path requires a real file). Route through the existing `Engine` seam
+(`Apply` / `Restore` / `SetPaused` / `Capabilities`): either a second
+implementation selected by kind, or `gslapperEngine` growing an effect
+branch. `SetPaused` today is video-only; KindEffect must pause.
+
 One selected backend per output: applying an effect stops the owned gSlapper
 or fallback on that connector first (existing generation/ready/retire path).
 Applying an image/video stops the owned terminal instance the same way.
 Never kill a user-launched `sysc-terminal` or gSlapper whose argv lacks our
 socket path.
+
+Theme seed: v1 does not write `theme.source`/`theme.seed` from an effect.
+Leave the previous seed. Depth-clock masks stay image-path-based; an effect
+assignment does not install a mask.
 
 Reconnect: persist the effect assignment; replay on the connector. Startup
 reconcile unchanged. Restore on an effect output relaunches the engine with
