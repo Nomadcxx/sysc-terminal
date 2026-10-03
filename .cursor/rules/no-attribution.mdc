@@ -1,0 +1,21 @@
+---
+description: Never attribute commits or pushes to coding tools
+alwaysApply: true
+---
+
+# No tool attribution
+
+This repository has one golden rule: a commit that names or is authored by a
+coding tool must never be created, and must never be pushed.
+
+- Do not add `Co-authored-by` trailers.
+- Do not set author or committer to a tool identity.
+- Do not write tool names into the commit message. The machine `commit-msg`
+  hook already rejects many of those words, including ordinary English that
+  happens to match them. Prefer a short human message.
+- Never pass `--no-verify`.
+- Before `git push`, run `git log --format='%an %ae %cn %ce%n%B' origin/main..HEAD`
+  (or the equivalent for a new branch) and confirm every commit is
+  `Nomadcxx <noovie@gmail.com>` with a clean message.
+- If a tool injected attribution, rewrite locally before any push. A tainted
+  commit that has been pushed is a broken release, not a documentation issue.

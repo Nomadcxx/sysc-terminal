@@ -1,0 +1,12 @@
+/sysc-terminal
+*.test
+*.out
+go.work
+go.work.sum
+.tmp-go/
+.worktrees/
+.beads/*.db
+.beads/*.db-*
+.beads/daemon.*
+.env
+*.sock
