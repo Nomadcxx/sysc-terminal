@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -12,8 +11,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"unicode/utf8"
 
+	"github.com/Nomadcxx/sysc-terminal/internal/asset"
 	"golang.org/x/sys/unix"
 )
 
@@ -21,9 +20,6 @@ const maxLine = 4096
 
 // ponytail: 16 concurrent calls cover normal control bursts; excess clients close immediately.
 const maxHandlers = 16
-
-// ponytail: 64 KiB is ample for text artwork and bounds retained input before it reaches an effect.
-const maxArtworkBytes = 64 << 10
 
 type State interface {
 	Status() (playing bool, id, theme string)
@@ -307,113 +303,9 @@ func nextToken(line string, i int) (string, int) {
 	return line[start:i], i
 }
 
-func CheckFile(path string) error {
-	if path == "" || !utf8.ValidString(path) || strings.ContainsAny(path, "\x00\n\r") {
-		return fmt.Errorf("file")
-	}
-	if !filepath.IsAbs(path) {
-		return fmt.Errorf("file not absolute")
-	}
-	home, _ := os.UserHomeDir()
-	if home == "" {
-		return fmt.Errorf("file not allowed")
-	}
-	if !withinAllowedRoots(filepath.Clean(path), allowedRoots(home)) {
-		return fmt.Errorf("file not allowed")
-	}
-	return nil
-}
-
-func ReadArtwork(path string) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return "", fmt.Errorf("artwork: home directory unavailable")
-	}
-	return readArtwork(path, home)
-}
-
-func readArtwork(path, home string) (string, error) {
-	if err := checkFile(path, home); err != nil {
-		return "", err
-	}
-	realPath, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return "", err
-	}
-	realPath, err = filepath.Abs(realPath)
-	if err != nil || !withinAllowedRoots(filepath.Clean(realPath), canonicalRoots(home)) {
-		return "", fmt.Errorf("artwork: resolved path not allowed")
-	}
-	fd, err := unix.Open(realPath, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
-	if err != nil {
-		return "", err
-	}
-	f := os.NewFile(uintptr(fd), realPath)
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
-		return "", err
-	}
-	if !fi.Mode().IsRegular() {
-		return "", fmt.Errorf("artwork: not a regular file")
-	}
-	if fi.Size() > maxArtworkBytes {
-		return "", fmt.Errorf("artwork: exceeds %d bytes", maxArtworkBytes)
-	}
-	data, err := io.ReadAll(io.LimitReader(f, maxArtworkBytes+1))
-	if err != nil {
-		return "", err
-	}
-	if len(data) > maxArtworkBytes {
-		return "", fmt.Errorf("artwork: exceeds %d bytes", maxArtworkBytes)
-	}
-	if !utf8.Valid(data) {
-		return "", fmt.Errorf("artwork: must be UTF-8")
-	}
-	return string(data), nil
-}
-
-func checkFile(path, home string) error {
-	if path == "" || home == "" || !utf8.ValidString(path) || strings.ContainsAny(path, "\x00\n\r") {
-		return fmt.Errorf("file")
-	}
-	if !filepath.IsAbs(path) {
-		return fmt.Errorf("file not absolute")
-	}
-	if !withinAllowedRoots(filepath.Clean(path), allowedRoots(home)) {
-		return fmt.Errorf("file not allowed")
-	}
-	return nil
-}
-
-func allowedRoots(home string) []string {
-	return []string{
-		filepath.Join(home, ".config"),
-		filepath.Join(home, ".local", "share"),
-		"/usr/share",
-		"/usr/local/share",
-	}
-}
-
-func canonicalRoots(home string) []string {
-	roots := allowedRoots(home)
-	for i, root := range roots {
-		if real, err := filepath.EvalSymlinks(root); err == nil {
-			roots[i] = real
-		}
-	}
-	return roots
-}
-
-func withinAllowedRoots(path string, roots []string) bool {
-	for _, root := range roots {
-		rel, err := filepath.Rel(root, path)
-		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-			return true
-		}
-	}
-	return false
-}
+func CheckFile(path string) error                   { return asset.CheckFile(path) }
+func ReadArtwork(path string) (string, error)       { return asset.ReadArtwork(path) }
+func readArtwork(path, home string) (string, error) { return asset.ReadArtworkAt(path, home) }
 
 func sameUID(c net.Conn) bool {
 	uc, ok := c.(*net.UnixConn)

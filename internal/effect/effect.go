@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/Nomadcxx/sysc-Go/animations"
+	"github.com/Nomadcxx/sysc-terminal/internal/asset"
 	"github.com/Nomadcxx/sysc-terminal/internal/cell"
-	"github.com/Nomadcxx/sysc-terminal/internal/ipc"
 )
 
 const (
@@ -52,7 +52,7 @@ func New(id, theme string, cols, rows int, text string) (*Effect, error) {
 }
 
 func NewFromFile(id, theme string, cols, rows int, path string) (*Effect, error) {
-	text, err := ipc.ReadArtwork(path)
+	text, err := asset.ReadArtwork(path)
 	if err != nil {
 		return nil, err
 	}

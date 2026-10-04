@@ -412,7 +412,7 @@ func TestReadArtworkRejectsSymlinkEscapeAndOversize(t *testing.T) {
 	}
 
 	large := filepath.Join(allowed, "large.txt")
-	if err := os.WriteFile(large, make([]byte, maxArtworkBytes+1), 0o600); err != nil {
+	if err := os.WriteFile(large, make([]byte, (64<<10)+1), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := readArtwork(large, home); err == nil {

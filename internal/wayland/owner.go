@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -188,30 +187,7 @@ func NewOwner(cfg Config) (*Owner, error) {
 	return o, nil
 }
 
-func findFont(explicit string) (string, error) {
-	if explicit != "" {
-		fi, err := os.Stat(explicit)
-		if err != nil {
-			return "", err
-		}
-		if !fi.Mode().IsRegular() {
-			return "", fmt.Errorf("wayland: font %q is not a regular file", explicit)
-		}
-		return explicit, nil
-	}
-	paths := []string{
-		"/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf",
-		"/usr/share/fonts/TTF/JetBrainsMono-Regular.ttf",
-		"/usr/share/fonts/noto/NotoSansMono-Regular.ttf",
-	}
-	for _, path := range paths {
-		fi, err := os.Stat(path)
-		if err == nil && fi.Mode().IsRegular() {
-			return path, nil
-		}
-	}
-	return "", fmt.Errorf("wayland: no supported font found; tried %v", paths)
-}
+func findFont(explicit string) (string, error) { return raster.FindFont(explicit) }
 
 func (o *Owner) Wake() {
 	if o == nil {
