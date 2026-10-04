@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"math"
 	"os"
 
@@ -15,6 +16,9 @@ import (
 )
 
 const rasterCacheMax = 256
+
+// ponytail: cap font reads at 32 MiB; larger fonts need a streaming loader and budget review.
+const maxFontFileBytes = 32 << 20
 
 type rasterKey struct {
 	gid  font.GID
@@ -51,9 +55,27 @@ func BufferSize(width, height, slots int) (stride, total int, err error) {
 }
 
 func Open(path string, pixelSize int) (*Rasterizer, error) {
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("raster: font is not a regular file")
+	}
+	if info.Size() > maxFontFileBytes {
+		return nil, fmt.Errorf("raster: font exceeds %d MiB limit", maxFontFileBytes>>20)
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxFontFileBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxFontFileBytes {
+		return nil, fmt.Errorf("raster: font exceeds %d MiB limit", maxFontFileBytes>>20)
 	}
 	if pixelSize < 1 {
 		pixelSize = 1
@@ -254,7 +276,7 @@ func (r *Rasterizer) raster(face *font.Face, gid font.GID) *image.Alpha {
 	ink := image.Rectangle{Min: image.Pt(r.cellW, r.cellH), Max: image.Point{}}
 	for y := 0; y < r.cellH; y++ {
 		row := y * mask.Stride
-		for x := 0; x < r.cellW; x++ {
+		for x := 0; x < glyphWidth; x++ {
 			if mask.Pix[row+x] == 0 {
 				continue
 			}

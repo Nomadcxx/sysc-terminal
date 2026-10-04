@@ -5,6 +5,8 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/Nomadcxx/sysc-terminal/internal/cell"
@@ -328,5 +330,52 @@ func TestCellTileCacheMatchesRasterAndStaysBounded(t *testing.T) {
 	}
 	if len(rz.tiles) != 0 {
 		t.Fatal("font resize retained stale tiles")
+	}
+}
+
+func TestRasterizeWideGlyphIncludesSecondCell(t *testing.T) {
+	path := "/usr/share/fonts/droid/DroidSansFallbackFull.ttf"
+	if _, err := os.Stat(path); err != nil {
+		t.Skipf("CJK test font unavailable: %v", err)
+	}
+	rz, err := Open(path, 12)
+	if err != nil {
+		t.Fatalf("open CJK font: %v", err)
+	}
+	face := font.NewFace(rz.font)
+	face.SetPpem(rz.ppem, rz.ppem)
+	gid, ok := face.NominalGlyph('界')
+	if !ok {
+		t.Fatal("CJK font has no glyph for 界")
+	}
+	mask := rz.raster(face, gid)
+	if mask.Bounds().Max.X <= rz.cellW {
+		t.Fatalf("wide glyph ink ends at x=%d, cell width=%d", mask.Bounds().Max.X, rz.cellW)
+	}
+	for y := mask.Bounds().Min.Y; y < mask.Bounds().Max.Y; y++ {
+		for x := rz.cellW; x < mask.Bounds().Max.X; x++ {
+			if mask.AlphaAt(x, y).A != 0 {
+				return
+			}
+		}
+	}
+	t.Fatal("wide glyph has no ink in its second cell")
+}
+
+func TestOpenRejectsFontOverMemoryLimit(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "oversized-font-*.ttf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Truncate((32 << 20) + 1); err != nil {
+		_ = f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_, err = Open(f.Name(), 12)
+	if err == nil || !strings.Contains(err.Error(), "exceeds 32 MiB") {
+		t.Fatalf("oversized font error = %v", err)
 	}
 }

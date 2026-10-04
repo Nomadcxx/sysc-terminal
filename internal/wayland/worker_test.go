@@ -1,10 +1,14 @@
 package wayland
 
 import (
+	"errors"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/Nomadcxx/sysc-terminal/internal/effect"
+	"golang.org/x/sys/unix"
 )
 
 func TestEffectWorkerTicksAndHonorsPause(t *testing.T) {
@@ -76,6 +80,55 @@ func TestEffectWorkerChangeAndResize(t *testing.T) {
 	frame = receiveFrame(t, w.frames)
 	if frame.grid == nil || frame.grid.Cols != 100 || frame.grid.Rows != 30 {
 		t.Fatalf("resized frame grid = %+v", frame.grid)
+	}
+}
+
+func TestOwnerWakeDoesNotWriteToReusedDescriptorAfterFinish(t *testing.T) {
+	for round := 0; round < 10000; round++ {
+		wake := [2]int{}
+		if err := unix.Pipe2(wake[:], unix.O_CLOEXEC|unix.O_NONBLOCK); err != nil {
+			t.Fatal(err)
+		}
+		o := &Owner{done: make(chan struct{}), wakeRead: wake[0], wakeWrite: wake[1]}
+		start, stop := make(chan struct{}), make(chan struct{})
+		var writers sync.WaitGroup
+		for i := 0; i < 8; i++ {
+			writers.Add(1)
+			go func() {
+				defer writers.Done()
+				<-start
+				for {
+					select {
+					case <-stop:
+						return
+					default:
+						o.Wake()
+						runtime.Gosched()
+					}
+				}
+			}()
+		}
+		close(start)
+		for i := 0; i < 4; i++ {
+			runtime.Gosched()
+		}
+		o.finish()
+		reused := [2]int{}
+		if err := unix.Pipe2(reused[:], unix.O_CLOEXEC|unix.O_NONBLOCK); err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < 4; i++ {
+			runtime.Gosched()
+		}
+		close(stop)
+		writers.Wait()
+		var b [8]byte
+		n, err := unix.Read(reused[0], b[:])
+		_ = unix.Close(reused[0])
+		_ = unix.Close(reused[1])
+		if n > 0 || (err != nil && !errors.Is(err, unix.EAGAIN)) {
+			t.Fatalf("round %d: stale wake wrote %d bytes to a reused descriptor (err %v)", round, n, err)
+		}
 	}
 }
 

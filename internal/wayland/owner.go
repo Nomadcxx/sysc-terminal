@@ -92,6 +92,7 @@ type Owner struct {
 	done       chan struct{}
 	finishOnce sync.Once
 	started    atomic.Bool
+	wakeMu     sync.Mutex
 	wakeRead   int
 	wakeWrite  int
 
@@ -213,7 +214,12 @@ func findFont(explicit string) (string, error) {
 }
 
 func (o *Owner) Wake() {
-	if o == nil || o.wakeWrite < 0 {
+	if o == nil {
+		return
+	}
+	o.wakeMu.Lock()
+	defer o.wakeMu.Unlock()
+	if o.wakeWrite < 0 {
 		return
 	}
 	_, _ = unix.Write(o.wakeWrite, []byte{1})
@@ -249,6 +255,8 @@ func (o *Owner) finish() {
 		if o.worker != nil {
 			o.worker.close()
 		}
+		o.wakeMu.Lock()
+		defer o.wakeMu.Unlock()
 		if o.wakeRead >= 0 {
 			_ = unix.Close(o.wakeRead)
 			o.wakeRead = -1
