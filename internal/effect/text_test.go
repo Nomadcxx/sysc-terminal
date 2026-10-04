@@ -95,13 +95,9 @@ func TestResizeClampsFloor(t *testing.T) {
 }
 
 func TestNewFromFileReadsAllowedPath(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "never")
-	// Allowed tree: $HOME/.config. Write a temp file there if HOME is writable.
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dir = filepath.Join(home, ".config", "sysc-terminal-test")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := filepath.Join(home, ".config", "sysc-terminal-test")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +105,6 @@ func TestNewFromFileReadsAllowedPath(t *testing.T) {
 	if err := os.WriteFile(path, []byte("HELLO"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Remove(path); os.Remove(dir) })
 	e, err := NewFromFile("fire-text", "nord", 80, 24, path)
 	if err != nil {
 		t.Fatalf("new from file: %v", err)

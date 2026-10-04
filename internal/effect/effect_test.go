@@ -2,10 +2,13 @@ package effect
 
 import (
 	"bufio"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/Nomadcxx/sysc-Go/animations"
+	"github.com/Nomadcxx/sysc-terminal/internal/cell"
 )
 
 func TestFireConstructAndTick(t *testing.T) {
@@ -79,6 +82,52 @@ func TestPausedTickDoesNotRender(t *testing.T) {
 	}
 }
 
+func TestTextEffectRequiresArtwork(t *testing.T) {
+	if _, err := New("fire-text", "nord", 80, 24, ""); err == nil {
+		t.Fatal("text effect started without required artwork")
+	}
+}
+
+func TestResetRestartsEffectAndClearsGrid(t *testing.T) {
+	e, err := New("fire", "nord", 80, 24, "")
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	e.Tick()
+	if e.Grid() == nil {
+		t.Fatal("tick produced no grid")
+	}
+	if err := e.Reset(); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	if e.Grid() != nil {
+		t.Fatal("reset retained a stale frame")
+	}
+	e.Tick()
+	if e.Grid() == nil {
+		t.Fatal("tick after reset produced no grid")
+	}
+}
+
+type oversizedTicker struct{}
+
+func (oversizedTicker) Update()        {}
+func (oversizedTicker) Render() string { return strings.Repeat("x", cell.MaxFrameBytes+1) }
+
+func TestTickReturnsFrameParseError(t *testing.T) {
+	e, err := New("fire", "nord", 80, 24, "")
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	e.fx = oversizedTicker{}
+	if err := e.Tick(); err == nil {
+		t.Fatal("tick accepted oversized frame")
+	}
+	if e.Generation() != 0 {
+		t.Fatalf("generation advanced after parse failure: %d", e.Generation())
+	}
+}
+
 func TestListMatchesRegistry(t *testing.T) {
 	listed := map[string]bool{}
 	sc := bufio.NewScanner(strings.NewReader(List()))
@@ -100,5 +149,21 @@ func TestListMatchesRegistry(t *testing.T) {
 		if animations.GetEffectMetadata(id) == nil {
 			t.Fatalf("--list printed unknown id %q", id)
 		}
+	}
+}
+
+func TestNewFromFileBoundsArtworkRead(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	config := filepath.Join(home, ".config")
+	if err := os.Mkdir(config, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(config, "art.txt")
+	if err := os.WriteFile(path, make([]byte, 64<<10+1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewFromFile("fire-text", "nord", 80, 24, path); err == nil {
+		t.Fatal("oversized artwork was accepted")
 	}
 }

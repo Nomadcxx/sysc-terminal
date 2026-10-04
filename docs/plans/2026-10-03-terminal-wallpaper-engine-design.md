@@ -3,8 +3,8 @@
 Date: 2026-10-03. Tracker: `sysc-912`. Depends on feasibility audit in
 this directory. Status lives in bd, not here.
 
-Design **not approved** until owner accepts architecture, scope, numeric
-resource budget. Implementation = Stage 3 of commission, waits for that yes.
+Owner approved D1–D11 and the numeric budget on 2026-10-04. Desktop live
+qualification and installation were separately approved the same day.
 
 ## Goal
 
@@ -102,7 +102,7 @@ characters. So:
 
 **Crop direction, decided.** Earlier revision said "construct effects at
 `max(cols,21)` × `max(rows,24)` then crop/centre", silent
-no-op at real 3440×1440 (430×90 well above floor), undefined
+no-op at real 3440×1440 (491×90 well above floor), undefined
 elsewhere. Floor exists because fireworks does
 `rand.Intn(width-20)` and aquarium fish ranges panic on `n <= 0`; construction-time
 guard, not layout intent. So effect always
@@ -124,14 +124,15 @@ constructed at `max(cols,21)` × `max(rows,24)`, and:
 - `width*height*4` must not overflow int32; reject at configure time, not at
   buffer creation.
 
-**Per-glyph alpha cache: required, not optimisation.** At 430×90 frame
-is 38 700 cells, at 20 FPS = 774 000 glyph rasterisations per
-second if each cell goes through `vector.Rasterizer` every frame. sysc-shell
+**Per-glyph alpha cache: required, not optimisation.** At the measured
+491×90 frame size there are 44 190 cells; at 8.3 FPS that is 368 250
+glyph rasterisations per second if each cell goes through `vector.Rasterizer`
+every frame. sysc-shell
 measured same trap — per-frame glyph raster was 15% of bar repaint — and
 its `internal/render/text.go` keeps `map[rasterKey]Mask` of per-glyph
 `*image.Alpha` rasters, bounded at 256 with half-when-full eviction. Monospace
 font at 12 px draws from few dozen distinct codepoints, so per-glyph **alpha**
-cache turns steady state into 38 700 small bitmap
+cache turns steady state into 44 190 small bitmap
 blits plus tint. Requirements:
 
 - Key on (glyph id, ppem) only. Cache alpha mask; tint with cell `38;2` colour at blit. Fire/matrix/skull emit many distinct RGBs; colour in key plus 256-entry bound evicts every frame, you pay
@@ -140,9 +141,11 @@ blits plus tint. Requirements:
   RSS cap.
 - Cache `*font.Font`, not `*font.Face`: font read-only and
   concurrent-safe, face not.
-- Check: second identical frame costs no more than first
-  after warm-up. Without cache ratio is 38 700 rasterisations per frame,
-  test fails immediately.
+- Check: draw an identical frame twice and assert every cached glyph key
+  retains the same alpha-mask pointer. This proves cache reuse without a
+  timing-sensitive unit test; Task 8 measures steady-state draw cost at
+  wallpaper size. Without cache, the second draw replaces the masks and the
+  check fails.
 
 Font: first existing path among config `font_path`, then
 `/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf`,
@@ -167,8 +170,9 @@ two sources of truth for same decision, can disagree. Frame
 callback = only clock:
 
 - Compositor `wl_surface.frame` callback only thing that
-  requests frame. 60 Hz display asks 60 times/second, owner advances effect only if at least 50 ms passed since last
-  tick. 144 Hz display throttled same way. Display that stops
+  requests frame. The owner advances at most once per 120 ms (8.3 FPS),
+  leaving 30 ms of CPU per frame within the 25% one-core budget.
+  60 Hz and 144 Hz displays use the same limit. Display that stops
   sending callbacks stops engine, which is what 1 Hz link or
   occluded-and-idle surface should do anyway.
 - If previous tick still in flight when callback arrives, tick dropped. Same rule as capacity-1 channel latest-wins, not
@@ -401,7 +405,7 @@ Handwritten C/CGO requires new owner approval. Not part of this design.
      │  layer-shell Background, shm, frame cb, pause flag
      │         │
      │         ▼
-     │  frame callback, ≥50ms since last tick
+     │  frame callback, ≥120ms since last tick
      │         │
      │         ▼
      │  sysc-Go effect.Update/Render  ──► bounded SGR ──► cell grid
@@ -417,12 +421,16 @@ floor, palette from sysc-Go not copied table). Cells in `internal/cell`.
 Raster in `internal/raster`. IPC in `internal/ipc`. `cmd/sysc-terminal` =
 flags + wiring.
 
-## Resource budget (proposed)
+## Resource budget (approved)
 
-Owner must accept or rewrite these numbers before Stage 3.
+Owner approved D1–D11 and the numeric budget on 2026-10-04. The 20 FPS target
+missed the headless CPU gate. At 12.5 FPS, a CGO-disabled run later measured
+CPU p95 24.441 ms (30.6% of the 80 ms interval), so the approved first
+fallback, lower frame rate, was applied. Other numeric budget limits are
+unchanged.
 
 Effect: `fire`. Font: default 12 px logical (15 device px at scale 1.25).
-Target: 20 FPS. Soak: 10 minutes.
+Target: at most 8.3 FPS. Soak: 10 minutes.
 
 | Gate | Desktop 3440×1440 / 1 | Laptop 1536×864 / 1.25 |
 |---|---|---|
@@ -434,25 +442,31 @@ Target: 20 FPS. Soak: 10 minutes.
 
 ### Where the budget goes — measured versus unmeasured
 
-| Component | Status | At 430×90 | Share of 50 ms |
+| Component | Status | At 491×90 | Share of 120 ms |
 |---|---|---|---|
-| `Update` + `Render` | **measured** | p95 **8.43 ms**, 248 029 B/frame | ~17% |
-| Bounded parse of those bytes | unmeasured, by construction one pass | — | small |
-| Glyph raster, cached (D4) | unmeasured | few dozen distinct glyphs at 12 px, tinted blits | unknown |
-| Glyph raster, uncached | unmeasured, and 774 000 rasters/s | not acceptable | would likely blow the gate |
-| `wl_shm` upload + attach | unmeasured | 19.3 MB/frame, double-buffered | unknown |
+| `Update` + `Render` + bounded parse | **measured** | CPU p95 **11.782 ms** | — |
+| Whole effect + parse + cached raster | **measured headlessly** | CPU p95 **23.884 ms**, wall p95 **30.369 ms** | **19.9% CPU** |
+| Raster portion | **measured headlessly** | CPU p95 **7.910 ms** | — |
+| Glyph raster, uncached | not used; cache check confirms reuse | 368 250 rasters/s at 8.3 FPS | not acceptable |
+| `wl_shm` attach and compositor response | unmeasured; live gate required | 19.8 MB/frame, double-buffered | unknown |
 
-Earlier revision cited "ANSI-only fire at 240×64 was 3.7 ms/frame
-measured" and left wallpaper size as inference. Now measured at
-wallpaper size: **p95 8.43 ms** at 430×90, 17% of tick,
-leaves room. Unmeasured half = raster, budget not defensible
-until measured.
+The latest CGO-disabled desktop budget check uses the configured 12 px
+JetBrains Mono Nerd font. Its measured cell size is 7×16 device pixels,
+yielding 491×90 cells at 3440×1440. At the 120 ms target interval, CPU p95
+was 23.884 ms (19.9% of one core) and wall p95 was 30.369 ms. The CPU cap is
+30 ms per frame. Earlier 80 ms runs passed, but one measured 24.441 ms CPU
+p95 (30.6% of one core), which did not leave dependable headroom. The 20 FPS
+target also failed its original cap. This gate does not measure Wayland
+attach/response or live RSS soak.
 
 **Therefore first budget gate headless, at real cell count, no
 compositor.** Check at 80×24 is 20× smaller than real grid and exercises
 no raster, passes no matter how broken actual path is. Gate
-ticks N frames of `Update` → `Render` → parse → raster at 430×90, fails on
-mean or p95. Cheapest honest proof of largest unknown, must not be deferred to live soak. If it misses, fixes in order: skip-rate, then smaller font, then cell-level dirty-rect upload — not new renderer architecture.
+ticks N frames of `Update` → `Render` → parse → raster at the font-derived
+491×90 grid, fails if wall time reaches 120 ms or CPU mean/p95 reaches 30 ms
+(25% of the target interval). The approved skip-rate fallback is now in use;
+if this gate misses again, remaining fixes are a smaller font, then cell-level
+dirty-rect upload — not a new renderer architecture.
 
 Two-output hardware: separate unrun gate, not v1 blocker on this machine.
 
@@ -479,13 +493,7 @@ First vertical slice: `fire` (no text). Second: `fire-text` or `matrix-art`
 
 ## Open items for the owner
 
-1. Accept D1–D11 or name change.
-2. Accept or rewrite resource numbers. `Update`+`Render` half
-   measured (p95 8.43 ms at 430×90); raster half not, plan puts
-   headless 430×90 check ahead of live soak to measure it.
-3. Approve or defer Experiment B (live namespace probe).
-4. Confirm exclusive zone 0 rather than gSlapper live -1.
-5. Confirm v1.0.3 pin (no skull) versus waiting on sysc-Go release.
-6. Confirm blank preview tile in D8, or ask for `--preview` now.
-7. Degenerate outputs (cell grid under 21×24) refuse assignment. Decided. Remaining owner items: exclusive zone, skull pin, Experiment B,
-   blank preview.
+The owner approved desktop Experiment B, Task 9 live qualification, and
+installation on 2026-10-04. Laptop and two-output qualification remain
+separate gates. Exclusive zone 0, the v1.0.3 pin, blank effect preview, and
+refusal below 21×24 cells are settled design decisions.

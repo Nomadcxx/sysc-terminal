@@ -1,11 +1,13 @@
 package raster
 
 import (
+	"bytes"
+	"image"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/Nomadcxx/sysc-terminal/internal/cell"
+	"github.com/go-text/typesetting/font"
 )
 
 var fontPaths = []string{
@@ -35,6 +37,13 @@ func TestRejectsOverflowGeometry(t *testing.T) {
 	}
 }
 
+func TestRejectsMachineIntOverflowGeometry(t *testing.T) {
+	maxInt := int(^uint(0) >> 1)
+	if _, _, err := BufferSize(maxInt, 1, 1); err == nil {
+		t.Fatal("machine-int overflowing buffer size accepted")
+	}
+}
+
 func TestDrawsColouredGlyph(t *testing.T) {
 	rz := openTestFont(t)
 	g, err := cell.Parse("\033[38;2;255;0;0mX\033[0m ", 2, 1)
@@ -56,7 +65,7 @@ func TestDrawsColouredGlyph(t *testing.T) {
 	}
 	covered := 0
 	for i := 0; i+3 < len(dst); i += 4 {
-		if dst[i] != 0 || dst[i+1] != 0 || dst[i+2] != 0 || dst[i+3] != 0 {
+		if dst[i+2] != 0 && dst[i+3] == 255 {
 			covered++
 		}
 	}
@@ -65,13 +74,157 @@ func TestDrawsColouredGlyph(t *testing.T) {
 	}
 }
 
-func TestSecondFrameCostsNoMoreThanFirst(t *testing.T) {
+func TestBlankCellIsOpaqueBlack(t *testing.T) {
+	rz := openTestFont(t)
+	g, err := cell.Parse(" ", 1, 1)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cw, ch := rz.CellSize()
+	stride, total, err := BufferSize(cw, ch, 1)
+	if err != nil {
+		t.Fatalf("size: %v", err)
+	}
+	dst := make([]byte, total)
+	if err := rz.Draw(g, dst, cw, ch, stride); err != nil {
+		t.Fatalf("draw: %v", err)
+	}
+	for i := 0; i+3 < len(dst); i += 4 {
+		if dst[i] != 0 || dst[i+1] != 0 || dst[i+2] != 0 || dst[i+3] != 255 {
+			t.Fatalf("pixel at byte %d = %v, want opaque black", i, dst[i:i+4])
+		}
+	}
+}
+
+func TestWideGlyphBlitsAcrossItsSecondCell(t *testing.T) {
+	rz := openTestFont(t)
+	face := font.NewFace(rz.font)
+	face.SetPpem(rz.ppem, rz.ppem)
+	gid, ok := face.NominalGlyph('界')
+	if !ok {
+		gid = 0
+	}
+	g, err := cell.Parse("界A", 3, 1)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	wideMask := image.NewAlpha(image.Rect(0, 0, 2*rz.cellW, rz.cellH))
+	for y := 0; y < rz.cellH; y++ {
+		for x := rz.cellW; x < 2*rz.cellW; x++ {
+			wideMask.Pix[y*wideMask.Stride+x] = 255
+		}
+	}
+	rz.cache[rasterKey{gid: gid, ppem: rz.ppem}] = wideMask
+	width, height := 3*rz.cellW, rz.cellH
+	stride, total, err := BufferSize(width, height, 1)
+	if err != nil {
+		t.Fatalf("size: %v", err)
+	}
+	dst := make([]byte, total)
+	if err := rz.Draw(g, dst, width, height, stride); err != nil {
+		t.Fatalf("draw: %v", err)
+	}
+	covered := 0
+	for y := 0; y < height; y++ {
+		for x := rz.cellW; x < 2*rz.cellW; x++ {
+			off := y*stride + x*4
+			if dst[off] != 0 || dst[off+1] != 0 || dst[off+2] != 0 {
+				covered++
+			}
+		}
+	}
+	if covered == 0 {
+		t.Fatal("wide glyph did not paint any pixels in its second cell")
+	}
+}
+
+func TestDrawChangesMatchesFullDrawAcrossFrames(t *testing.T) {
+	rz := openTestFont(t)
+	cw, ch := rz.CellSize()
+	const cols, rows = 4, 2
+	width, height := cols*cw, rows*ch
+	stride, total, err := BufferSize(width, height, 1)
+	if err != nil {
+		t.Fatalf("size: %v", err)
+	}
+	frames := []string{
+		"\033[38;2;255;0;0mA界\033[0m  \n\033[48;2;10;20;30m X \033[0m",
+		"\033[38;2;0;255;0mABCD\033[0m\n\033[48;2;40;50;60m Y \033[0m",
+		" \033[38;2;0;0;255m界Z\033[0m \n    ",
+		"\033[48;2;1;2;3m    \033[0m\n\033[38;2;0;0;255m界Q\033[0m ",
+	}
+	dirty := make([]byte, total)
+	var previous *cell.Grid
+	for i, frame := range frames {
+		current, err := cell.Parse(frame, cols, rows)
+		if err != nil {
+			t.Fatalf("parse frame %d: %v", i, err)
+		}
+		if err := rz.DrawChanged(current, previous, dirty, width, height, stride); err != nil {
+			t.Fatalf("draw changed frame %d: %v", i, err)
+		}
+		full := make([]byte, total)
+		if err := rz.Draw(current, full, width, height, stride); err != nil {
+			t.Fatalf("draw full frame %d: %v", i, err)
+		}
+		if !bytes.Equal(dirty, full) {
+			t.Fatalf("changed draw differs from full draw at frame %d", i)
+		}
+		previous = current
+	}
+}
+
+func TestMixMatchesExactAlpha(t *testing.T) {
+	for dst := 0; dst < 256; dst++ {
+		for src := 0; src < 256; src++ {
+			for cov := 0; cov < 256; cov++ {
+				want := byte((dst*(255-cov) + src*cov) / 255)
+				if got := mix(byte(dst), byte(src), byte(cov)); got != want {
+					t.Fatalf("mix(%d, %d, %d) = %d, want %d", dst, src, cov, got, want)
+				}
+			}
+		}
+	}
+}
+
+func TestSetPixelSizeUpdatesCellMetrics(t *testing.T) {
+	rz := openTestFont(t)
+	baseW, baseH := rz.CellSize()
+	if err := rz.SetPixelSize(24); err != nil {
+		t.Fatalf("set pixel size: %v", err)
+	}
+	largeW, largeH := rz.CellSize()
+	if largeW <= baseW || largeH <= baseH {
+		t.Fatalf("24px cell %dx%d did not grow beyond 12px cell %dx%d", largeW, largeH, baseW, baseH)
+	}
+	if err := rz.SetPixelSize(12); err != nil {
+		t.Fatalf("restore pixel size: %v", err)
+	}
+	if gotW, gotH := rz.CellSize(); gotW != baseW || gotH != baseH {
+		t.Fatalf("restored cell %dx%d, want %dx%d", gotW, gotH, baseW, baseH)
+	}
+}
+
+func TestSecondFrameReusesGlyphMasks(t *testing.T) {
 	f := newFixture(t)
 	g := f.solidGrid('▒', 100)
-	first := f.timeN(func() { f.Draw(g) }, 5)
-	second := f.timeN(func() { f.Draw(g) }, 5)
-	if second > first*105/100 {
-		t.Fatalf("cached frame %v slower than cold %v; glyph cache is not being hit", second, first)
+	f.Draw(g)
+	cached := make(map[rasterKey]*image.Alpha, len(f.rz.cache))
+	for key, mask := range f.rz.cache {
+		cached[key] = mask
+	}
+	if len(cached) == 0 {
+		t.Fatal("first frame did not populate the glyph cache")
+	}
+
+	f.Draw(g)
+	if len(f.rz.cache) != len(cached) {
+		t.Fatalf("cache size after identical frame = %d, want %d", len(f.rz.cache), len(cached))
+	}
+	for key, mask := range cached {
+		if f.rz.cache[key] != mask {
+			t.Fatalf("identical frame replaced cached mask for glyph %d", key.gid)
+		}
 	}
 }
 
@@ -117,14 +270,6 @@ func (f *fixture) Draw(g *cell.Grid) {
 	if err := f.rz.Draw(g, dst, f.w, f.h, stride); err != nil {
 		f.t.Fatalf("draw: %v", err)
 	}
-}
-
-func (f *fixture) timeN(fn func(), n int) time.Duration {
-	start := time.Now()
-	for i := 0; i < n; i++ {
-		fn()
-	}
-	return time.Since(start)
 }
 
 func TestFontMissingFails(t *testing.T) {

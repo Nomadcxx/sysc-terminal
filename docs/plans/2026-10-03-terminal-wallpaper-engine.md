@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go, sysc-wayland **v0.3.1** (generated layer-shell / fractional-scale / viewporter), sysc-Go v1.0.3, go-text/typesetting, Unix-socket IPC.
 
-**Do not start until owner approves design and resource numbers.** Experiment B (live surface) also needs explicit yes.
+**Owner approved D1–D11, the numeric budget, desktop live qualification, and installation on 2026-10-04.**
 
 Work in dedicated worktree of this repo, branch `feat/engine`, based on `origin/main`. Shell work = second worktree of sysc-shell based on `origin/main`. Never implement on dirty primary checkout.
 
@@ -262,7 +262,7 @@ func TestSecondFrameCostsNoMoreThanFirst(t *testing.T) {
 }
 ```
 
-At 430×90 = 38 700 cells per frame at 20 FPS = **774 000 glyph rasterisations per second** with no cache. sysc-shell hit identical trap — per-frame glyph raster was 15% of bar repaint — and its `internal/render/text.go` keeps per-glyph `*image.Alpha` masks in `map[rasterKey]Mask` bounded at 256 with half-when-full eviction. Monospace font at D4's 12 px cell draws from few dozen codepoints, so per-(glyph, ppem) alpha cache, tinted at blit, turns steady state into blits. Design D4 makes this requirement; do not put colour in cache key. This is the check. Implementation requirements: bounded map with eviction (budget caps RSS), cache `*font.Font` not `*font.Face`, because font read-only and concurrent-safe, face not.
+At the measured 491×90 = 44 190 cells per frame and 8.3 FPS = **368 250 glyph rasterisations per second** with no cache. sysc-shell hit identical trap — per-frame glyph raster was 15% of bar repaint — and its `internal/render/text.go` keeps per-glyph `*image.Alpha` masks in `map[rasterKey]Mask` bounded at 256 with half-when-full eviction. Monospace font at D4's 12 px cell draws from few dozen codepoints, so per-(glyph, ppem) alpha cache, tinted at blit, turns steady state into blits. Design D4 makes this requirement; do not put colour in cache key. This is the check. Implementation requirements: bounded map with eviction (budget caps RSS), cache `*font.Font` not `*font.Face`, because font read-only and concurrent-safe, face not.
 
 API notes for this typesetting version, obvious spellings do not compile: `font.Face.NominalGlyph(rune) (GID, bool)` (not `GlyphIndex`), `GlyphDataOutline(GID) (GlyphOutline, bool)`, `HorizontalAdvance(GID) float32`, `SetPpem(x, y uint16)`, `FontHExtents() (FontExtents, bool)` with **no `Upem` field** (`(*font.Font).Upem()` is method), no `LineMetric` constant named `LHMetric`. `shaping.Glyph.GlyphID`, `shaping.Bounds.Ascent/Descent/Gap`. `vector.Rasterizer.Draw` takes `*image.Uniform`.
 
@@ -290,9 +290,9 @@ Previous revision said "fake host records `SetInputRegion` empty, `SetExclusiveZ
 
 **Step 2:** FAIL.
 
-**Step 3:** Bindings already generated in Task 0. Owner goroutine: registry bind compositor, shm, output, layer-shell, optional fractional-scale. Per chosen connector name, create surface per D3. Configure → allocate shm (double-buffer, wait for release) per shell's proven `internal/platform/wayland/shm.go` pattern: `unix.MemfdCreate(..., unix.MFD_CLOEXEC)`, `Ftruncate`, `Mmap(... MAP_SHARED)`, `shm.CreatePool`, one `CreateBuffer` per slot, whole generation retired as unit. Frame callback → if playing and ≥50 ms since last tick, raster and attach; else skip. Paused: do not request `Surface.Frame` at all. SIGTERM unmaps and exits 0.
+**Step 3:** Bindings already generated in Task 0. Owner goroutine: registry bind compositor, shm, output, layer-shell, optional fractional-scale. Per chosen connector name, create surface per D3. Configure → allocate shm (double-buffer, wait for release) per shell's proven `internal/platform/wayland/shm.go` pattern: `unix.MemfdCreate(..., unix.MFD_CLOEXEC)`, `Ftruncate`, `Mmap(... MAP_SHARED)`, `shm.CreatePool`, one `CreateBuffer` per slot, whole generation retired as unit. Frame callback → if playing and ≥120 ms since last tick, raster and attach; else skip. Paused: do not request `Surface.Frame` at all. SIGTERM unmaps and exits 0.
 
-**One clock.** No ticker. Frame callback only thing requesting frame; 50 ms floor lives in tick gate. Two clocks disagree, fast display then over-renders. If tick still in flight when callback arrives, drop it — same rule as capacity-1 channel, not second one.
+**One clock.** No ticker. Frame callback only thing requesting frame; 120 ms floor lives in tick gate to meet the accepted CPU budget. Two clocks disagree, fast display then over-renders. If tick still in flight when callback arrives, drop it — same rule as capacity-1 channel, not second one.
 
 **Step 4:** On compositor error or display disconnect, unmap, log one line, exit non-zero. Add check that error path returns non-nil error rather than looping, so shell's generation logic sees process gone and restarts it. Process surviving its display owns nothing and looks healthy from shell side: black wallpaper, "running" pill, no recovery.
 
@@ -390,22 +390,22 @@ Cross-repo gate: shell PR waits on sysc-terminal binary answering `query`. Recor
 **Step 2 — budget gate, at real size.** Previous revision's optional check ticked 50 frames at 80×24, failed if mean > 20 ms, then said "live numbers are the real gate". Both halves wrong:
 
 - 80×24 is 1 920 cells vs 38 700 at wallpaper size, 20× less work; and
-- measured `Update`+`Render` p95 at 430×90 is **8.43 ms**, so 20 ms budget at 80×24 passes with roughly 20× headroom however broken real path is. Exercises no raster at all.
+- measured `Update`+`Render` p95 at 430×90 is **8.43 ms**, so a 20 ms budget at 80×24 passes with roughly 20× headroom however broken real path is. Exercises no raster at all.
 
 So gate is headless, at real cell count, through whole pipeline:
 
 ```go
 func TestWallpaperFrameBudget(t *testing.T) {
 	// Grid from D4 against the chosen font at pixelSize 12 on 3440×1440,
-	// not a hardcoded 8×16 cell. 430×90 was the audit's 8×16 measurement
-	// of Update+Render only; the live grid is advance(M)×lineHeight.
+	// not a hardcoded 8×16 cell. The current desktop font measures 7×16
+	// device pixels, yielding 491×90 cells.
 	// Update -> Render -> parse -> raster, no compositor, real system font.
 	// Fail on mean and on p95 against the owner's accepted numbers.
 	// Report every number even when passing, so the gate leaves a record.
 }
 ```
 
-`Update`+`Render` p95 8.43 ms is known floor; owner's remaining budget is difference. Run it, write actual numbers into handover — first measurement of raster half, which audit could not obtain and which is single largest unknown in design. If it misses, fixes in order: skip-rate, then smaller font, then dirty-rect upload. Not new renderer architecture, not longer soak.
+The 20 FPS run failed its 12.5 ms CPU-per-frame cap. At 12.5 FPS (80 ms), earlier runs passed with CPU p95 values of 17.256 ms, 13.947 ms, and 16.860 ms. A later CGO-disabled run measured CPU p95 24.441 ms (30.6% of the interval), exceeding the 20 ms cap. Following the approved tuning order, cadence was reduced to 8.3 FPS (120 ms). The latest CGO-disabled run measured CPU mean 15.768 ms, p95 23.884 ms (19.9% of one core); wall mean 17.072 ms, p95 30.369 ms; effect-plus-parse CPU p95 15.974 ms and raster CPU p95 7.910 ms. The updated cap is 30 ms CPU and 120 ms wall per frame, preserving the 25% CPU share. Font: JetBrainsMonoNerdFont-Regular, 12 px; grid 491×90, cells 7×16. These headless checks exclude compositor response and live RSS soak. If the gate misses, remaining tuning is a smaller font, then cell-level dirty-rect upload; do not introduce a new renderer or longer soak.
 
 **Step 3–4:** TDD as usual. Check must print measurements whether passes or fails; gate nobody can inspect afterward is not evidence.
 
@@ -415,7 +415,7 @@ func TestWallpaperFrameBudget(t *testing.T) {
 
 ### Task 9: Live qualification (desktop)
 
-Requires owner approval to touch live wallpaper.
+Owner approved desktop live qualification on 2026-10-04.
 
 Record:
 
@@ -425,7 +425,7 @@ Record:
 4. Click desktop; niri keybind still works
 5. Pause: CPU drops; `query` says paused; CPU sample over 30 s while paused at idle with `Update`/`Render` count unchanged
 6. Change to `rain`; visual change (capture two frames)
-7. Stop/restore still wallpaper via panel
+7. Apply the original still image through the Wallpaper picker and verify it replaces the effect; the effect assignment's Restore action replays the persisted effect.
 8. Layers shows `slapper` again (or awww)
 9. `ps` RSS/CPU vs design budget
 10. **10-minute soak**: leave playing, sample RSS at 0/1/5/10 min, record delta against < 10 MiB cap. Budget names this gate; previous plan revision had no task for it, so would have shipped unmeasured.
@@ -443,11 +443,11 @@ Write `docs/plans/2026-10-03-terminal-wallpaper-engine-completion-handover.md` w
 | After | Review |
 |---|---|
 | Task 2 | Headless fire grid looks right in dumped PPM optional; `--list` matches registry |
-| Task 3 | Glyph cache actually hit (second frame ≈ first) |
+| Task 3 | Second identical draw reuses cached alpha masks; Task 8 measures steady-state cost |
 | Task 4 | Experiment B / layer spec constants; disconnect exits non-zero |
 | Task 6 | Registry table |
 | Task 7 | Shell persist + supervise tests; `EngineFor` branch order |
-| Task 8 | **Headless 430×90 budget numbers recorded — first raster measurement** |
+| Task 8 | **Headless 491×90 budget numbers recorded — first raster measurement** |
 | Task 9 | Live budget + soak RSS series + restore |
 
 Upstream gates: sysc-Go > v1.0.3 for skull; shell KindEffect merge; `sysc-911` must not add conflicting wallpaper-effect store. sysc-wayland **not** gate: v0.3.1 pinned because shell `origin/main` pins it and because v0.2.2's `RegisterWithID` panics when server reuses proxy ID.

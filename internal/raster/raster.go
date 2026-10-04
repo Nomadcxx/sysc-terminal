@@ -22,7 +22,7 @@ type rasterKey struct {
 }
 
 type Rasterizer struct {
-	face  *font.Face
+	font  *font.Font
 	ppem  uint16
 	scale float32
 	cellW int
@@ -30,17 +30,22 @@ type Rasterizer struct {
 	base  int
 	cache map[rasterKey]*image.Alpha
 	order []rasterKey
+	black []byte
 }
 
 func BufferSize(width, height, slots int) (stride, total int, err error) {
 	if width <= 0 || height <= 0 || slots <= 0 {
 		return 0, 0, fmt.Errorf("raster: size %dx%d slots %d", width, height, slots)
 	}
-	s := int64(width) * 4
-	tot := s * int64(height) * int64(slots)
-	if s > math.MaxInt32 || tot > math.MaxInt32 {
-		return 0, 0, fmt.Errorf("raster: %dx%d needs %d bytes", width, height, tot)
+	if width > math.MaxInt32/4 || height > math.MaxInt32 || slots > math.MaxInt32 {
+		return 0, 0, fmt.Errorf("raster: %dx%d slots %d exceed int32 buffer limits", width, height, slots)
 	}
+	s := int64(width) * 4
+	perSlot := s * int64(height)
+	if perSlot > math.MaxInt32 || int64(slots) > math.MaxInt32/perSlot {
+		return 0, 0, fmt.Errorf("raster: %dx%d slots %d exceed int32 buffer limits", width, height, slots)
+	}
+	tot := perSlot * int64(slots)
 	return int(s), int(tot), nil
 }
 
@@ -60,20 +65,35 @@ func Open(path string, pixelSize int) (*Rasterizer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("raster: parse font: %w", err)
 	}
-	face := font.NewFace(parsed)
+	r := &Rasterizer{font: parsed, cache: make(map[rasterKey]*image.Alpha)}
+	if err := r.SetPixelSize(pixelSize); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (r *Rasterizer) SetPixelSize(pixelSize int) error {
+	if r == nil || r.font == nil {
+		return fmt.Errorf("raster: nil font")
+	}
+	if pixelSize < 1 {
+		pixelSize = 1
+	}
+	if pixelSize > math.MaxUint16 {
+		return fmt.Errorf("raster: font pixel size %d exceeds uint16", pixelSize)
+	}
 	ppem := uint16(pixelSize)
+	if r.ppem == ppem {
+		return nil
+	}
+	face := font.NewFace(r.font)
 	face.SetPpem(ppem, ppem)
-	scale := float32(pixelSize) / float32(parsed.Upem())
-	cellW, cellH, base := metrics(face, scale, pixelSize)
-	return &Rasterizer{
-		face:  face,
-		ppem:  ppem,
-		scale: scale,
-		cellW: cellW,
-		cellH: cellH,
-		base:  base,
-		cache: make(map[rasterKey]*image.Alpha),
-	}, nil
+	r.ppem = ppem
+	r.scale = float32(pixelSize) / float32(r.font.Upem())
+	r.cellW, r.cellH, r.base = metrics(face, r.scale, pixelSize)
+	r.cache = make(map[rasterKey]*image.Alpha)
+	r.order = nil
+	return nil
 }
 
 func (r *Rasterizer) CellSize() (w, h int) {
@@ -84,13 +104,25 @@ func (r *Rasterizer) CellSize() (w, h int) {
 }
 
 func (r *Rasterizer) Draw(g *cell.Grid, dst []byte, width, height, stride int) error {
+	return r.DrawChanged(g, nil, dst, width, height, stride)
+}
+
+// DrawChanged redraws only cells that differ from the grid previously drawn
+// into this buffer. Each Wayland shm slot keeps its own prior grid because the
+// compositor releases alternating buffers with different frame contents.
+func (r *Rasterizer) DrawChanged(g, previous *cell.Grid, dst []byte, width, height, stride int) error {
 	if r == nil || g == nil {
 		return fmt.Errorf("raster: nil")
 	}
-	if stride < width*4 || len(dst) < stride*height {
+	if width <= 0 || height <= 0 || stride <= 0 || width > int(^uint(0)>>1)/4 || stride < width*4 || height > int(^uint(0)>>1)/stride || len(dst) < stride*height {
 		return fmt.Errorf("raster: buffer %d stride %d for %dx%d", len(dst), stride, width, height)
 	}
-	fill(dst, stride, width, height, color.RGBA{A: 255})
+	full := previous == nil || previous.Cols != g.Cols || previous.Rows != g.Rows
+	if full {
+		r.fillBlack(dst, stride, width, height)
+	}
+	face := font.NewFace(r.font)
+	face.SetPpem(r.ppem, r.ppem)
 	for y := 0; y < g.Rows; y++ {
 		dy := y * r.cellH
 		if dy >= height {
@@ -102,19 +134,48 @@ func (r *Rasterizer) Draw(g *cell.Grid, dst []byte, width, height, stride int) e
 				break
 			}
 			c := g.At(x, y)
-			bg := c.Bg
-			if bg.A == 0 {
-				bg = color.RGBA{A: 255}
-			}
-			cellFill(dst, stride, dx, dy, r.cellW, r.cellH, width, height, bg)
-			if c.Ch == ' ' || c.Ch == 0 {
+			if !full && c == previous.At(x, y) {
 				continue
 			}
-			mask := r.mask(c.Ch)
-			blit(dst, stride, dx, dy, width, height, mask, c.Fg)
+			if !full {
+				clearWidth := r.cellW
+				if r.wide(g, x, y) || r.wide(previous, x, y) {
+					clearWidth = 2 * r.cellW
+				}
+				clearOpaqueBlack(dst, stride, dx, dy, clearWidth, r.cellH, width, height)
+			}
+			r.drawCell(g, x, y, c, dst, width, height, stride, face)
 		}
 	}
 	return nil
+}
+
+func (r *Rasterizer) wide(g *cell.Grid, x, y int) bool {
+	return x+1 < g.Cols && g.At(x+1, y).Ch == 0
+}
+
+func (r *Rasterizer) drawCell(g *cell.Grid, x, y int, c cell.Cell, dst []byte, width, height, stride int, face *font.Face) {
+	if c.Ch == 0 {
+		return
+	}
+	dx, dy := x*r.cellW, y*r.cellH
+	cellWidth, clipWidth := r.cellW, r.cellW
+	if r.wide(g, x, y) {
+		cellWidth, clipWidth = 2*r.cellW, 2*r.cellW
+	}
+	bg := c.Bg
+	if bg.A == 0 {
+		bg = color.RGBA{A: 255}
+	}
+	// ponytail: the canvas starts opaque black, so leave transparent/default and explicit black cells alone.
+	if bg.R != 0 || bg.G != 0 || bg.B != 0 || bg.A != 255 {
+		cellFill(dst, stride, dx, dy, cellWidth, r.cellH, width, height, bg)
+	}
+	if c.Ch == ' ' {
+		return
+	}
+	mask := r.mask(face, c.Ch)
+	blit(dst, stride, dx, dy, width, height, mask, c.Fg, clipWidth)
 }
 
 func metrics(face *font.Face, scale float32, pixelSize int) (cellW, cellH, base int) {
@@ -143,8 +204,8 @@ func metrics(face *font.Face, scale float32, pixelSize int) (cellW, cellH, base 
 	return cellW, cellH, base
 }
 
-func (r *Rasterizer) mask(ch rune) *image.Alpha {
-	gid, ok := r.face.NominalGlyph(ch)
+func (r *Rasterizer) mask(face *font.Face, ch rune) *image.Alpha {
+	gid, ok := face.NominalGlyph(ch)
 	if !ok {
 		gid = 0
 	}
@@ -152,7 +213,7 @@ func (r *Rasterizer) mask(ch rune) *image.Alpha {
 	if m, hit := r.cache[key]; hit {
 		return m
 	}
-	m := r.raster(gid)
+	m := r.raster(face, gid)
 	if len(r.order) >= rasterCacheMax {
 		drop := len(r.order) / 2
 		for _, old := range r.order[:drop] {
@@ -165,16 +226,34 @@ func (r *Rasterizer) mask(ch rune) *image.Alpha {
 	return m
 }
 
-func (r *Rasterizer) raster(gid font.GID) *image.Alpha {
-	mask := image.NewAlpha(image.Rect(0, 0, r.cellW, r.cellH))
-	outline, ok := r.face.GlyphDataOutline(gid)
+func (r *Rasterizer) raster(face *font.Face, gid font.GID) *image.Alpha {
+	glyphWidth := int(math.Round(float64(face.HorizontalAdvance(gid) * r.scale)))
+	glyphWidth = max(r.cellW, min(glyphWidth, 2*r.cellW))
+	mask := image.NewAlpha(image.Rect(0, 0, glyphWidth, r.cellH))
+	outline, ok := face.GlyphDataOutline(gid)
 	if !ok || len(outline.Segments) == 0 {
-		return mask
+		return image.NewAlpha(image.Rectangle{})
 	}
-	rast := vector.NewRasterizer(r.cellW, r.cellH)
+	rast := vector.NewRasterizer(glyphWidth, r.cellH)
 	addOutline(rast, outline, 0, float32(r.base), r.scale)
 	rast.Draw(mask, mask.Bounds(), image.Opaque, image.Point{})
-	return mask
+	ink := image.Rectangle{Min: image.Pt(r.cellW, r.cellH), Max: image.Point{}}
+	for y := 0; y < r.cellH; y++ {
+		row := y * mask.Stride
+		for x := 0; x < r.cellW; x++ {
+			if mask.Pix[row+x] == 0 {
+				continue
+			}
+			ink.Min.X = min(ink.Min.X, x)
+			ink.Min.Y = min(ink.Min.Y, y)
+			ink.Max.X = max(ink.Max.X, x+1)
+			ink.Max.Y = max(ink.Max.Y, y+1)
+		}
+	}
+	if ink.Empty() {
+		return image.NewAlpha(image.Rectangle{})
+	}
+	return mask.SubImage(ink).(*image.Alpha)
 }
 
 func addOutline(rast *vector.Rasterizer, outline font.GlyphOutline, originX, originY, scale float32) {
@@ -201,8 +280,32 @@ func addOutline(rast *vector.Rasterizer, outline font.GlyphOutline, originX, ori
 	rast.ClosePath()
 }
 
-func fill(dst []byte, stride, width, height int, c color.RGBA) {
-	cellFill(dst, stride, 0, 0, width, height, width, height, c)
+func (r *Rasterizer) fillBlack(dst []byte, stride, width, height int) {
+	rowBytes := width * 4
+	if len(r.black) < rowBytes {
+		r.black = make([]byte, rowBytes)
+		for i := 3; i < rowBytes; i += 4 {
+			r.black[i] = 255
+		}
+	}
+	for y := 0; y < height; y++ {
+		row := dst[y*stride : y*stride+rowBytes]
+		copy(row, r.black[:rowBytes])
+	}
+}
+
+func clearOpaqueBlack(dst []byte, stride, x0, y0, cellW, cellH, width, height int) {
+	x1 := min(x0+cellW, width)
+	y1 := min(y0+cellH, height)
+	start := x0 * 4
+	end := x1 * 4
+	for y := y0; y < y1; y++ {
+		row := dst[y*stride : y*stride+stride]
+		clear(row[start:end])
+		for alpha := start + 3; alpha < end; alpha += 4 {
+			row[alpha] = 255
+		}
+	}
 }
 
 func cellFill(dst []byte, stride, x0, y0, cw, ch, width, height int, c color.RGBA) {
@@ -221,32 +324,40 @@ func cellFill(dst []byte, stride, x0, y0, cw, ch, width, height int, c color.RGB
 	}
 }
 
-func blit(dst []byte, stride, x0, y0, width, height int, mask *image.Alpha, fg color.RGBA) {
+func blit(dst []byte, stride, x0, y0, width, height int, mask *image.Alpha, fg color.RGBA, clipWidth int) {
 	if mask == nil {
 		return
 	}
+	fb, fg2, fr, _ := premul(fg)
 	mb := mask.Bounds()
-	for my := mb.Min.Y; my < mb.Max.Y; my++ {
-		dy := y0 + my - mb.Min.Y
-		if dy < 0 || dy >= height {
-			continue
-		}
+	if mb.Empty() {
+		return
+	}
+	minX := max(mb.Min.X, -x0)
+	minY := max(mb.Min.Y, -y0)
+	maxX := min(mb.Max.X, min(width-x0, clipWidth))
+	maxY := min(mb.Max.Y, height-y0)
+	if minX >= maxX || minY >= maxY {
+		return
+	}
+	for my := minY; my < maxY; my++ {
+		dy := y0 + my
 		row := dy * stride
-		for mx := mb.Min.X; mx < mb.Max.X; mx++ {
-			dx := x0 + mx - mb.Min.X
-			if dx < 0 || dx >= width {
-				continue
-			}
-			cov := mask.AlphaAt(mx, my).A
+		maskRow := mask.PixOffset(mb.Min.X, my)
+		for mx := minX; mx < maxX; mx++ {
+			dx := x0 + mx
+			cov := mask.Pix[maskRow+mx-mb.Min.X]
 			if cov == 0 {
 				continue
 			}
 			off := row + dx*4
-			fb, fg2, fr, fa := premul(fg)
+			if cov == 255 {
+				dst[off+0], dst[off+1], dst[off+2] = fb, fg2, fr
+				continue
+			}
 			dst[off+0] = mix(dst[off+0], fb, cov)
 			dst[off+1] = mix(dst[off+1], fg2, cov)
 			dst[off+2] = mix(dst[off+2], fr, cov)
-			dst[off+3] = mix(dst[off+3], fa, cov)
 		}
 	}
 }
@@ -258,5 +369,6 @@ func premul(c color.RGBA) (b, g, r, a byte) {
 
 func mix(dst, src, cov byte) byte {
 	c := uint32(cov)
-	return byte((uint32(dst)*(255-c) + uint32(src)*c) / 255)
+	v := uint32(dst)*(255-c) + uint32(src)*c
+	return byte((v + 1 + (v >> 8)) >> 8)
 }

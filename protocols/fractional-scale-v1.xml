@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+Upstream: https://gitlab.freedesktop.org/wayland/wayland-protocols
+Revision: tag 1.49, staging/fractional-scale/fractional-scale-v1.xml
+SHA-256: 5941de5d28f427ecdadddc8623a6f6af0a30b0ab4726847236ba7a7652b81316 (upstream XML bytes)
+-->
 <protocol name="fractional_scale_v1">
   <copyright>
     Copyright © 2022 Kenny Levinsen

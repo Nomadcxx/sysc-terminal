@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+Upstream: https://gitlab.freedesktop.org/wayland/wayland-protocols
+Revision: tag 1.49, stable/xdg-shell/xdg-shell.xml
+SHA-256: 7ba7f9c8473deee674cb1f154a18abd0bb0cc072604fc055b0c15e459fc4c7df (upstream XML bytes)
+-->
 <protocol name="xdg_shell">
 
   <copyright>

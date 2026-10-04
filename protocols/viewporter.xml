@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+Upstream: https://gitlab.freedesktop.org/wayland/wayland-protocols
+Revision: tag 1.49, stable/viewporter/viewporter.xml
+SHA-256: dcb12279a03746301fe490aaed4b38a403485a925abfce2ccfceb644e104fe71 (upstream XML bytes)
+-->
 <protocol name="viewporter">
 
   <copyright>

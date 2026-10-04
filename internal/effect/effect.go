@@ -2,7 +2,6 @@ package effect
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/Nomadcxx/sysc-Go/animations"
@@ -11,8 +10,8 @@ import (
 )
 
 const (
-	minCols = 21
-	minRows = 24
+	MinimumCols = 21
+	MinimumRows = 24
 )
 
 type ticker interface {
@@ -36,11 +35,14 @@ func New(id, theme string, cols, rows int, text string) (*Effect, error) {
 	if animations.GetThemeMetadata(theme) == nil {
 		return nil, fmt.Errorf("unknown theme %q", theme)
 	}
-	if cols < minCols {
-		cols = minCols
+	if requiresText(id) && text == "" {
+		return nil, fmt.Errorf("effect %q requires artwork", id)
 	}
-	if rows < minRows {
-		rows = minRows
+	if cols < MinimumCols {
+		cols = MinimumCols
+	}
+	if rows < MinimumRows {
+		rows = MinimumRows
 	}
 	fx, err := construct(id, theme, cols, rows, text)
 	if err != nil {
@@ -50,36 +52,48 @@ func New(id, theme string, cols, rows int, text string) (*Effect, error) {
 }
 
 func NewFromFile(id, theme string, cols, rows int, path string) (*Effect, error) {
-	if err := ipc.CheckFile(path); err != nil {
-		return nil, err
-	}
-	data, err := os.ReadFile(path)
+	text, err := ipc.ReadArtwork(path)
 	if err != nil {
 		return nil, err
 	}
-	return New(id, theme, cols, rows, string(data))
+	return New(id, theme, cols, rows, text)
 }
 
-func (e *Effect) Tick() {
+func (e *Effect) Tick() error {
 	if e == nil || e.paused || e.fx == nil {
-		return
+		return nil
 	}
 	e.fx.Update()
 	frame := e.fx.Render()
 	e.renders++
 	g, err := cell.Parse(frame, e.w, e.h)
 	if err != nil {
-		return
+		return err
 	}
 	e.grid = g
 	e.gen++
+	return nil
 }
 
-func (e *Effect) Grid() *cell.Grid { return e.grid }
-func (e *Effect) Generation() int  { return e.gen }
-func (e *Effect) RenderCount() int { return e.renders }
-func (e *Effect) EffectWidth() int { return e.w }
-func (e *Effect) SetPaused(p bool) { e.paused = p }
+func (e *Effect) Grid() *cell.Grid  { return e.grid }
+func (e *Effect) Generation() int   { return e.gen }
+func (e *Effect) RenderCount() int  { return e.renders }
+func (e *Effect) EffectWidth() int  { return e.w }
+func (e *Effect) EffectHeight() int { return e.h }
+func (e *Effect) SetPaused(p bool)  { e.paused = p }
+
+func (e *Effect) Reset() error {
+	if e == nil {
+		return fmt.Errorf("nil effect")
+	}
+	fx, err := construct(e.id, e.theme, e.w, e.h, e.text)
+	if err != nil {
+		return err
+	}
+	e.fx = fx
+	e.grid = nil
+	return nil
+}
 
 type textSetter interface {
 	SetText(string)
@@ -88,6 +102,9 @@ type textSetter interface {
 func (e *Effect) SetText(text string) error {
 	if e == nil {
 		return fmt.Errorf("nil effect")
+	}
+	if requiresText(e.id) && text == "" {
+		return fmt.Errorf("effect %q requires artwork", e.id)
 	}
 	s, ok := e.fx.(textSetter)
 	if !ok {
@@ -106,11 +123,11 @@ func (e *Effect) Resize(cols, rows int) error {
 	if e == nil {
 		return fmt.Errorf("nil effect")
 	}
-	if cols < minCols {
-		cols = minCols
+	if cols < MinimumCols {
+		cols = MinimumCols
 	}
-	if rows < minRows {
-		rows = minRows
+	if rows < MinimumRows {
+		rows = MinimumRows
 	}
 	e.w, e.h = cols, rows
 	if r, ok := e.fx.(resizer); ok {
@@ -149,6 +166,15 @@ func List() string {
 	}
 	fmt.Fprintf(&b, "version %s\n", animations.GetLibraryVersion())
 	return b.String()
+}
+
+func requiresText(id string) bool {
+	for _, name := range animations.GetTextBasedEffects() {
+		if name == id {
+			return true
+		}
+	}
+	return false
 }
 
 func construct(id, theme string, w, h int, text string) (ticker, error) {

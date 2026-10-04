@@ -2,6 +2,12 @@ package cell
 
 import "image/color"
 
+// ponytail: cap one frame at 1M cells (~24 MiB before effect state); raise only with a measured output budget.
+const MaxGridCells = 1_000_000
+
+// ponytail: 16 bytes per cell covers the measured renderer output with margin; raise only for a pinned effect that exceeds it.
+const MaxFrameBytes = 16 << 20
+
 var (
 	DefaultFg = color.RGBA{R: 255, G: 255, B: 255, A: 255}
 	DefaultBg = color.RGBA{A: 0}
