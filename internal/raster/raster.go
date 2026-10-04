@@ -31,6 +31,7 @@ type Rasterizer struct {
 	cache map[rasterKey]*image.Alpha
 	order []rasterKey
 	black []byte
+	tiles map[cell.Cell][]byte
 }
 
 func BufferSize(width, height, slots int) (stride, total int, err error) {
@@ -93,6 +94,7 @@ func (r *Rasterizer) SetPixelSize(pixelSize int) error {
 	r.cellW, r.cellH, r.base = metrics(face, r.scale, pixelSize)
 	r.cache = make(map[rasterKey]*image.Alpha)
 	r.order = nil
+	r.tiles = make(map[cell.Cell][]byte)
 	return nil
 }
 
@@ -137,6 +139,15 @@ func (r *Rasterizer) DrawChanged(g, previous *cell.Grid, dst []byte, width, heig
 			if !full && c == previous.At(x, y) {
 				continue
 			}
+			if !r.wide(g, x, y) && (full || !r.wide(previous, x, y)) && c.Ch != 0 {
+				if tile := r.tile(c, face); tile != nil {
+					rowBytes := min(r.cellW, width-dx) * 4
+					for row := 0; row < min(r.cellH, height-dy); row++ {
+						copy(dst[(dy+row)*stride+dx*4:][:rowBytes], tile[row*r.cellW*4:][:rowBytes])
+					}
+					continue
+				}
+			}
 			if !full {
 				clearWidth := r.cellW
 				if r.wide(g, x, y) || r.wide(previous, x, y) {
@@ -158,9 +169,12 @@ func (r *Rasterizer) drawCell(g *cell.Grid, x, y int, c cell.Cell, dst []byte, w
 	if c.Ch == 0 {
 		return
 	}
-	dx, dy := x*r.cellW, y*r.cellH
+	r.drawGlyphCell(c, r.wide(g, x, y), x*r.cellW, y*r.cellH, dst, width, height, stride, face)
+}
+
+func (r *Rasterizer) drawGlyphCell(c cell.Cell, wide bool, dx, dy int, dst []byte, width, height, stride int, face *font.Face) {
 	cellWidth, clipWidth := r.cellW, r.cellW
-	if r.wide(g, x, y) {
+	if wide {
 		cellWidth, clipWidth = 2*r.cellW, 2*r.cellW
 	}
 	bg := c.Bg
@@ -371,4 +385,24 @@ func mix(dst, src, cov byte) byte {
 	c := uint32(cov)
 	v := uint32(dst)*(255-c) + uint32(src)*c
 	return byte((v + 1 + (v >> 8)) >> 8)
+}
+
+// ponytail: 256 tiles of at most 4 KiB bound added storage to 1 MiB;
+// larger cells and new colours after the cap use the glyph path. A measured
+// need for palette turnover can replace this with bounded eviction.
+func (r *Rasterizer) tile(c cell.Cell, face *font.Face) []byte {
+	if r.cellW > 4096/4/r.cellH {
+		return nil
+	}
+	if pixels, ok := r.tiles[c]; ok {
+		return pixels
+	}
+	if len(r.tiles) >= rasterCacheMax {
+		return nil
+	}
+	pixels := make([]byte, r.cellW*r.cellH*4)
+	r.fillBlack(pixels, r.cellW*4, r.cellW, r.cellH)
+	r.drawGlyphCell(c, false, 0, 0, pixels, r.cellW, r.cellH, r.cellW*4, face)
+	r.tiles[c] = pixels
+	return pixels
 }

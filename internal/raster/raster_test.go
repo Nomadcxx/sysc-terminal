@@ -3,6 +3,7 @@ package raster
 import (
 	"bytes"
 	"image"
+	"image/color"
 	"math"
 	"testing"
 
@@ -276,5 +277,56 @@ func TestFontMissingFails(t *testing.T) {
 	_, err := Open("/no/such/font.ttf", 12)
 	if err == nil {
 		t.Fatal("missing font accepted")
+	}
+}
+
+func TestCellTileCacheMatchesRasterAndStaysBounded(t *testing.T) {
+	rz := openTestFont(t)
+	cw, ch := rz.CellSize()
+	face := font.NewFace(rz.font)
+	face.SetPpem(rz.ppem, rz.ppem)
+	for _, frame := range []string{"\033[38;2;127;31;240mABC ", "\033[48;2;20;70;90mX Y ", "    "} {
+		g, err := cell.Parse(frame, 4, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stride, total, _ := BufferSize(4*cw-2, ch-1, 1)
+		got, want := make([]byte, total), make([]byte, total)
+		rz.fillBlack(want, stride, 4*cw-2, ch-1)
+		for x := 0; x < 4; x++ {
+			rz.drawCell(g, x, 0, g.At(x, 0), want, 4*cw-2, ch-1, stride, face)
+		}
+		if err := rz.Draw(g, got, 4*cw-2, ch-1, stride); err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("cached raster differs for %q", frame)
+		}
+	}
+	if len(rz.tiles) == 0 {
+		t.Fatal("no coloured cell tiles cached")
+	}
+	g, _ := cell.Parse("X", 1, 1)
+	for i := 0; i < 600; i++ {
+		c := g.At(0, 0)
+		c.Fg = color.RGBA{R: byte(i), G: byte(i >> 8), A: 255}
+		rz.tile(c, face)
+	}
+	if len(rz.tiles) > rasterCacheMax {
+		t.Fatalf("tile cache grew to %d", len(rz.tiles))
+	}
+	uncached := cell.Cell{Ch: 'X', Fg: color.RGBA{R: 90, G: 100, B: 210, A: 255}}
+	if rz.tile(uncached, face) != nil {
+		t.Fatal("full cache allocated a tile for a new colour")
+	}
+	if allocs := testing.AllocsPerRun(100, func() { rz.tile(uncached, face) }); allocs != 0 {
+		t.Fatalf("full cache allocated %.0f objects for new colours", allocs)
+	}
+
+	if err := rz.SetPixelSize(15); err != nil {
+		t.Fatal(err)
+	}
+	if len(rz.tiles) != 0 {
+		t.Fatal("font resize retained stale tiles")
 	}
 }

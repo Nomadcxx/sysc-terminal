@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Nomadcxx/sysc-terminal/internal/cell"
 	"github.com/Nomadcxx/sysc-terminal/internal/wayland/layershell"
 )
 
@@ -73,7 +74,7 @@ func TestPauseCancelsPendingFrameCallback(t *testing.T) {
 }
 
 func TestTargetFrameIntervalProvidesApprovedCPUMargin(t *testing.T) {
-	const want = 120 * time.Millisecond
+	const want = 50 * time.Millisecond
 	if TargetFrameInterval != want {
 		t.Fatalf("target frame interval = %s, want %s for the measured CPU budget", TargetFrameInterval, want)
 	}
@@ -81,15 +82,15 @@ func TestTargetFrameIntervalProvidesApprovedCPUMargin(t *testing.T) {
 
 func TestAdvanceThrottledBeforeTargetFrameInterval(t *testing.T) {
 	last := time.Unix(1, 0)
-	if ShouldAdvance(last, last.Add(119*time.Millisecond)) {
-		t.Fatal("advanced a tick before 120ms")
+	if ShouldAdvance(last, last.Add(49*time.Millisecond)) {
+		t.Fatal("advanced a tick before 50ms")
 	}
 }
 
 func TestAdvanceAtTargetFrameInterval(t *testing.T) {
 	last := time.Unix(1, 0)
-	if !ShouldAdvance(last, last.Add(120*time.Millisecond)) {
-		t.Fatal("did not advance at the 120ms frame interval")
+	if !ShouldAdvance(last, last.Add(50*time.Millisecond)) {
+		t.Fatal("did not advance at the 50ms frame interval")
 	}
 }
 
@@ -115,5 +116,26 @@ func TestBufferReleaseRetriesPendingPaint(t *testing.T) {
 func TestResumeAdvancesFromZeroLast(t *testing.T) {
 	if !ShouldAdvance(time.Time{}, time.Unix(1, 0)) {
 		t.Fatal("resume with no prior tick did not advance")
+	}
+}
+
+func TestFrameIntervalStartsWhenTickSubmitted(t *testing.T) {
+	now := time.Unix(100, 0)
+	w := &effectWorker{requests: make(chan workerRequest, 16), frames: make(chan workerResult, 1), acks: make(chan workerAck, 16), stop: make(chan struct{})}
+	o := &Owner{worker: w}
+	o.onFrame(now)
+	if !o.tickPending || o.lastTick != now {
+		t.Fatalf("tick pending=%t last=%v, want submission time %v", o.tickPending, o.lastTick, now)
+	}
+	w.frames <- workerResult{grid: &cell.Grid{Cols: 1, Rows: 1}}
+	if err := o.drainWorker(); err != nil {
+		t.Fatal(err)
+	}
+	if o.lastTick != now {
+		t.Fatal("frame completion reset the submission clock")
+	}
+	o.onFrame(now.Add(TargetFrameInterval))
+	if len(w.requests) != 1 {
+		t.Fatal("queued another tick while one is pending")
 	}
 }

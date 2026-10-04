@@ -683,7 +683,6 @@ func (o *Owner) drainWorker() error {
 			o.latest, o.hasLatest = frame, true
 			o.pendingPaint = true
 			o.effectID, o.theme = frame.id, frame.theme
-			o.lastTick = time.Now()
 			if o.configured && o.pendingLayout == nil {
 				if err := o.paintLatest(); err != nil {
 					return err
@@ -860,6 +859,7 @@ func (o *Owner) onFrame(now time.Time) {
 	if !o.tickPending && ShouldAdvance(o.lastTick, now) {
 		if o.worker.submit(workerRequest{op: workerTick}) {
 			o.tickPending = true
+			o.lastTick = now
 			return
 		}
 	}

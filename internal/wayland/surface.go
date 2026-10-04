@@ -8,9 +8,9 @@ import (
 	"github.com/Nomadcxx/sysc-terminal/internal/wayland/layershell"
 )
 
-// TargetFrameInterval sets an 8.3 FPS ceiling; 30 ms of CPU per frame then
-// equals 25% of one core.
-const TargetFrameInterval = 120 * time.Millisecond
+// TargetFrameInterval sets a 20 FPS ceiling; cached cells and allocation-free
+// colour decoding meet the measured fire CPU gate of 12.5 ms (25% of one core).
+const TargetFrameInterval = 50 * time.Millisecond
 
 type Spec struct {
 	Namespace        string
