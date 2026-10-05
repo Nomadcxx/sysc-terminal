@@ -163,7 +163,11 @@ func TestRejectsConnectionsWhenHandlerLimitReached(t *testing.T) {
 		t.Fatalf("dial excess handler: %v", err)
 	}
 	defer c.Close()
-	if _, err := io.WriteString(c, "query\n"); err != nil {
+	// The server closes the excess connection as soon as it accepts it, so the
+	// write below races that close: it either lands in the socket buffer or
+	// hits EPIPE. Either is the rejection; the read assertion below is what
+	// proves the connection was not served.
+	if _, err := io.WriteString(c, "query\n"); err != nil && !errors.Is(err, syscall.EPIPE) {
 		t.Fatalf("write excess handler: %v", err)
 	}
 	_ = c.SetReadDeadline(time.Now().Add(time.Second))
