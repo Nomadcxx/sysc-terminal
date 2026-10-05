@@ -1,85 +1,127 @@
-# sysc-terminal
+<p align="center"><img src="assets/wordmark.png" alt="sysc-terminal" height="120"></p>
 
-A Wayland wallpaper engine that paints live [sysc-Go](https://github.com/Nomadcxx/sysc-Go)
-terminal effects onto Niri’s background layer.
+<p align="center"><strong>Live terminal effects as your Wayland wallpaper.</strong></p>
 
-[sysc-shell](https://github.com/Nomadcxx/sysc-shell) selects it as a wallpaper
-backend next to gSlapper. One process per output. Desktop input stays with
-the compositor. Effects stay behind windows.
+<p align="center">Paints sysc-Go terminal animations onto Niri's background layer. sysc-shell selects it as a wallpaper backend next to gSlapper.</p>
 
-## What this is
+## What it is
 
-- A dedicated Go binary (`sysc-terminal`) that maps a real
-  `wlr-layer-shell` **Background** surface.
-- A bounded ANSI cell grid plus font raster into `wl_shm`.
-- The same supervision model as gSlapper: owned Unix socket, `query` /
-  `pause` / `resume` / `change` / `stop`.
+sysc-terminal is a wallpaper engine. It maps a `wlr-layer-shell` Background surface on one output
+and paints a live sysc-Go effect into it: a bounded ANSI cell grid is parsed and rasterised into
+`wl_shm` buffers. One process runs per output, and desktop input stays with the compositor.
 
-## What this is not
+## What it is not
 
-- Not [sysc-walls](https://github.com/Nomadcxx/sysc-walls) (Kitty screensaver).
-- Not a terminal emulator, compositor, or lock screen.
-- Not gSlapper and not GPL. Effects come from sysc-Go (MIT). Transport from
-  [sysc-wayland](https://github.com/Nomadcxx/sysc-wayland) (BSD-3).
+- Not [sysc-walls](https://github.com/Nomadcxx/sysc-walls), the idle screensaver
+- Not a terminal emulator, compositor or lock screen
+- Not [gSlapper](https://github.com/Nomadcxx/gSlapper), which plays video and is GPL-licensed
 
-A live Background surface is invisible once `ext-session-lock-v1` blanks
-normal clients. KindEffect lock backgrounds are a sysc-lock problem; see
-`docs/plans/2026-10-03-lockscreen-parity-audit.md`.
+## How it fits together
+
+```mermaid
+flowchart LR
+    greet["sysc-greet<br/>graphical greeter"] -->|starts configured session| shell["sysc-shell<br/>desktop shell"]
+
+    subgraph session["Session"]
+        lock["sysc-lock<br/>session locker"]
+    end
+
+    subgraph daemons["Companion daemons"]
+        notify["sysc-notify<br/>notifications"]
+        clipboard["sysc-clipboard<br/>clipboard history"]
+        tray["sysc-tray<br/>system tray"]
+    end
+
+    subgraph wallpaper["Wallpaper and idle"]
+        gslapper["gSlapper<br/>video wallpaper"]
+        terminal["sysc-terminal<br/>terminal effects"]
+        walls["sysc-walls<br/>idle screensaver"]
+    end
+
+    subgraph libs["Shared Go libraries"]
+        wayland["sysc-wayland<br/>Wayland transport"]
+        launch["sysc-launch<br/>app launcher"]
+        metrics["sysc-metrics<br/>system telemetry"]
+    end
+
+    plugins["sysc-plugins<br/>plugin source"]
+
+    shell -->|spawns| session
+    shell -->|connects to| daemons
+    shell -->|drives| wallpaper
+    shell -->|links| libs
+    shell -->|installs from| plugins
+
+    classDef current fill:#7aa2f7,stroke:#1a1b26,color:#1a1b26,stroke-width:2px
+    class terminal current
+```
+
+[The sysc ecosystem](https://github.com/Nomadcxx/sysc-shell/blob/main/docs/ecosystem.md) explains
+each connection, socket and version pin.
+
+## Features
+
+- `wlr-layer-shell` Background surface, namespace `sysc-terminal`
+- Bounded ANSI cell grid with a subset of SGR colour, wide-rune handling, and caps on frame bytes
+  and cells
+- Font rasterisation with a glyph cache, into double-buffered `wl_shm` ARGB8888 buffers
+- 20 FPS ceiling; the warmed `fire`/`nord` frame check at 3440×1440 targets less than 25% of one
+  CPU core (mean and p95). CPU use varies with effect, font, output and hardware.
+- One process per output, each with its own socket
+- `--list` reports the effect IDs, themes and text effects from the live sysc-Go registry
+- Text effects accept `--file`
 
 ## Install
 
-Install Go 1.26 or newer, then:
+Runtime rendering needs a monospace font. The default search checks JetBrains Mono (Nerd Font
+first) under `/usr/share/fonts/TTF/`, then Noto Sans Mono under `/usr/share/fonts/noto/`.
+Use `--font /path/to/font.ttf` for another location.
 
 ```bash
 GOBIN="$HOME/.local/bin" CGO_ENABLED=0 go install github.com/Nomadcxx/sysc-terminal/cmd/sysc-terminal@main
+export PATH="$HOME/.local/bin:$PATH"
 sysc-terminal --list
 ```
 
-Keep `~/.local/bin` on the shell service's PATH. Restart sysc-shell after
-installing so it can probe the effect catalog. In PR #96, open **Terminal Art**
-from the Control Centre or Settings, choose an effect and palette, then apply
-it to an output. Settings also stores the default palette for new selections.
-The shell stops its gSlapper process when switching to terminal effects.
+Keep `~/.local/bin` on the PATH of the shell service, then restart sysc-shell so it probes the
+catalog. In sysc-shell, open Terminal Art from the Control Centre or Settings, choose an effect and
+palette, and apply it to an output.
 
-For a reproducible install, replace `main` with a published commit hash.
-
-## Run
-
-Niri must provide `WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR`:
+## Usage
 
 ```bash
-sysc-terminal --output eDP-1 --effect fire --theme nord \
-  --ipc-socket "$XDG_RUNTIME_DIR/sysc-terminal.sock"
+sysc-terminal --output eDP-1 --effect fire --theme nord --ipc-socket "$XDG_RUNTIME_DIR/sysc-terminal.sock"
 ```
 
-Use the connector name reported by `niri msg outputs`. Start one process per
-output and give each a distinct socket. Stop any existing wallpaper on that
-output first. `--list` reports supported effect IDs, themes and text effects;
-text effects accept artwork through `--file`.
+Get the connector from `niri msg outputs`. Run one process per output with a distinct socket.
 
-The control socket accepts one newline-terminated command per connection:
-`query`, `pause`, `resume`, `change effect <id> theme <theme> [file <path>]`,
-`reset`, `stop`.
-The default ceiling is 20 FPS with a CPU budget of 25% of one core. Paused
-instances retain their last frame without ticking the effect.
+Socket verbs: `query`, `pause`, `resume`, `change effect <id> theme <theme> [file <path>]`,
+`reset`, `stop`. A paused process keeps its last frame.
 
-## Build and checks
+## Build
 
-The module pins sysc-Go at `v1.0.4-0.20261004042739-c80d48f1f38e` and
-sysc-wayland at `v0.3.1`. Niri first; no CGO.
+Pins Go 1.26, sysc-Go `v1.0.4-0.20261004042739-c80d48f1f38e` and sysc-wayland `v0.3.1`. Niri
+first, no CGO.
 
 ```bash
+go generate ./internal/wayland/...
 timeout 90s env CGO_ENABLED=0 GOMAXPROCS=2 go build -o /tmp/sysc-terminal ./cmd/sysc-terminal
 ```
 
-Run named tests in one package:
+Tests are named and run individually; the full tree and `-race` are not run on the development
+laptop.
 
-```bash
-timeout 90s env GOMAXPROCS=2 go test -count=1 <pkg> -run <Name>
-```
+## Documentation
 
-Do not run race checks or full-tree tests on the laptop.
+- [The sysc ecosystem](https://github.com/Nomadcxx/sysc-shell/blob/main/docs/ecosystem.md)
+- [docs/plans](docs/plans) — design and feasibility notes
 
-## Licence
+## License
 
-MIT.
+MIT. Effects come from [sysc-Go](https://github.com/Nomadcxx/sysc-Go) (MIT); transport from
+[sysc-wayland](https://github.com/Nomadcxx/sysc-wayland) (BSD-3-Clause).
+
+---
+
+<a href="https://github.com/Nomadcxx"><img src="https://raw.githubusercontent.com/Nomadcxx/Nomadcxx/main/assets/rama-mark.svg" height="22" alt="RAMA"></a> — terminal-native tooling for the linux desktop.
+[More projects →](https://github.com/Nomadcxx) · [Sponsor](https://github.com/sponsors/Nomadcxx) ❤️
