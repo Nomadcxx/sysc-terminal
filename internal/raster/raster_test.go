@@ -17,6 +17,8 @@ var fontPaths = []string{
 	"/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf",
 	"/usr/share/fonts/TTF/JetBrainsMono-Regular.ttf",
 	"/usr/share/fonts/noto/NotoSansMono-Regular.ttf",
+	// Ubuntu runners and minimal installs only ship DejaVu.
+	"/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
 }
 
 func openTestFont(t *testing.T) *Rasterizer {

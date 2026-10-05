@@ -30,6 +30,8 @@ var fontPaths = []string{
 	"/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
 	"/usr/share/fonts/TTF/JetBrainsMono-Regular.ttf",
 	"/usr/share/fonts/noto/NotoSansMono-Regular.ttf",
+	// Ubuntu runners and minimal installs only ship DejaVu.
+	"/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
 }
 
 // TestWallpaperFrameBudget is a hardware benchmark, not a correctness test: it

@@ -21,6 +21,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      # The raster and pipeline tests rasterise a real system font; the runner
+      # image ships DejaVu only, and nothing installs a mono TTF otherwise.
+      - name: install test fonts
+        run: sudo apt-get install -y --no-install-recommends fonts-dejavu-core
       - name: gofmt
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - name: vet
