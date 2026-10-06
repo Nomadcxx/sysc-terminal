@@ -6,8 +6,11 @@ import (
 	"image"
 	"image/color"
 	"io"
+	"log/slog"
 	"math"
 	"os"
+	"sort"
+	"sync"
 
 	"github.com/Nomadcxx/sysc-terminal/internal/cell"
 	"github.com/go-text/typesetting/font"
@@ -20,13 +23,23 @@ const rasterCacheMax = 256
 // ponytail: cap font reads at 32 MiB; larger fonts need a streaming loader and budget review.
 const maxFontFileBytes = 32 << 20
 
+// src is the face that drew the glyph; the same GID number means different
+// outlines in different faces, so the cache key must carry the face index.
 type rasterKey struct {
 	gid  font.GID
 	ppem uint16
+	src  uint8
 }
 
+// Rasterizer draws cells with the primary face and, per rune, falls back to
+// at most rasterFallbackMax extra faces when the primary lacks a glyph.
+// Cell metrics always come from the primary face, so a fallback can never
+// reflow the grid.
 type Rasterizer struct {
-	font  *font.Font
+	font  *font.Font // primary face source, == fonts[0]
+	fonts []*font.Font
+	faces []*font.Face // one per font at the current ppem
+
 	ppem  uint16
 	scale float32
 	cellW int
@@ -36,7 +49,17 @@ type Rasterizer struct {
 	order []rasterKey
 	black []byte
 	tiles map[cell.Cell][]byte
+
+	faceOf   map[rune]uint8 // resolved face per rune
+	affected map[rune]uint8 // runes that needed a fallback face
 }
+
+// rasterFallbackMax bounds the face set (primary + fallbacks);
+// affectedRunesMax bounds the diagnostic record.
+const (
+	rasterFallbackMax = 2
+	affectedRunesMax  = 256
+)
 
 func BufferSize(width, height, slots int) (stride, total int, err error) {
 	if width <= 0 || height <= 0 || slots <= 0 {
@@ -54,7 +77,48 @@ func BufferSize(width, height, slots int) (stride, total int, err error) {
 	return int(s), int(tot), nil
 }
 
+// Open loads path and quietly attaches up to rasterFallbackMax other
+// installed faces as per-glyph fallbacks.
 func Open(path string, pixelSize int) (*Rasterizer, error) {
+	return OpenWithFallbacks(append([]string{path}, fallbackFontPaths(path)...), pixelSize)
+}
+
+// OpenWithFallbacks builds a rasterizer from an ordered face chain; the
+// first path is the primary. The primary must parse; a fallback that fails
+// to load is skipped, because a broken file under a system font directory
+// must not stop the terminal.
+func OpenWithFallbacks(paths []string, pixelSize int) (*Rasterizer, error) {
+	var fonts []*font.Font
+	for _, path := range paths {
+		if len(fonts) > rasterFallbackMax {
+			break
+		}
+		parsed, err := loadFont(path)
+		if err != nil {
+			if len(fonts) == 0 {
+				return nil, err
+			}
+			continue
+		}
+		fonts = append(fonts, parsed)
+	}
+	if len(fonts) == 0 {
+		return nil, fmt.Errorf("raster: no usable font")
+	}
+	r := &Rasterizer{
+		font:   fonts[0],
+		fonts:  fonts,
+		cache:  make(map[rasterKey]*image.Alpha),
+		tiles:  make(map[cell.Cell][]byte),
+		faceOf: make(map[rune]uint8),
+	}
+	if err := r.SetPixelSize(pixelSize); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func loadFont(path string) (*font.Font, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -77,9 +141,6 @@ func Open(path string, pixelSize int) (*Rasterizer, error) {
 	if int64(len(data)) > maxFontFileBytes {
 		return nil, fmt.Errorf("raster: font exceeds %d MiB limit", maxFontFileBytes>>20)
 	}
-	if pixelSize < 1 {
-		pixelSize = 1
-	}
 	loader, err := ot.NewLoader(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("raster: load font: %w", err)
@@ -88,11 +149,7 @@ func Open(path string, pixelSize int) (*Rasterizer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("raster: parse font: %w", err)
 	}
-	r := &Rasterizer{font: parsed, cache: make(map[rasterKey]*image.Alpha)}
-	if err := r.SetPixelSize(pixelSize); err != nil {
-		return nil, err
-	}
-	return r, nil
+	return parsed, nil
 }
 
 func (r *Rasterizer) SetPixelSize(pixelSize int) error {
@@ -109,14 +166,22 @@ func (r *Rasterizer) SetPixelSize(pixelSize int) error {
 	if r.ppem == ppem {
 		return nil
 	}
-	face := font.NewFace(r.font)
-	face.SetPpem(ppem, ppem)
+	r.faces = r.faces[:0]
+	for _, f := range r.fonts {
+		face := font.NewFace(f)
+		face.SetPpem(ppem, ppem)
+		r.faces = append(r.faces, face)
+	}
 	r.ppem = ppem
 	r.scale = float32(pixelSize) / float32(r.font.Upem())
-	r.cellW, r.cellH, r.base = metrics(face, r.scale, pixelSize)
+	// Metrics always come from the primary face; a grid that reflows between
+	// glyphs is worse than one that clips a wide fallback glyph (blit clips).
+	r.cellW, r.cellH, r.base = metrics(r.faces[0], r.scale, pixelSize)
 	r.cache = make(map[rasterKey]*image.Alpha)
 	r.order = nil
 	r.tiles = make(map[cell.Cell][]byte)
+	r.faceOf = make(map[rune]uint8)
+	r.affected = make(map[rune]uint8)
 	return nil
 }
 
@@ -145,8 +210,6 @@ func (r *Rasterizer) DrawChanged(g, previous *cell.Grid, dst []byte, width, heig
 	if full {
 		r.fillBlack(dst, stride, width, height)
 	}
-	face := font.NewFace(r.font)
-	face.SetPpem(r.ppem, r.ppem)
 	for y := 0; y < g.Rows; y++ {
 		dy := y * r.cellH
 		if dy >= height {
@@ -162,7 +225,7 @@ func (r *Rasterizer) DrawChanged(g, previous *cell.Grid, dst []byte, width, heig
 				continue
 			}
 			if !r.wide(g, x, y) && (full || !r.wide(previous, x, y)) && c.Ch != 0 {
-				if tile := r.tile(c, face); tile != nil {
+				if tile := r.tile(c); tile != nil {
 					rowBytes := min(r.cellW, width-dx) * 4
 					for row := 0; row < min(r.cellH, height-dy); row++ {
 						copy(dst[(dy+row)*stride+dx*4:][:rowBytes], tile[row*r.cellW*4:][:rowBytes])
@@ -177,7 +240,7 @@ func (r *Rasterizer) DrawChanged(g, previous *cell.Grid, dst []byte, width, heig
 				}
 				clearOpaqueBlack(dst, stride, dx, dy, clearWidth, r.cellH, width, height)
 			}
-			r.drawCell(g, x, y, c, dst, width, height, stride, face)
+			r.drawCell(g, x, y, c, dst, width, height, stride)
 		}
 	}
 	return nil
@@ -187,14 +250,14 @@ func (r *Rasterizer) wide(g *cell.Grid, x, y int) bool {
 	return x+1 < g.Cols && g.At(x+1, y).Ch == 0
 }
 
-func (r *Rasterizer) drawCell(g *cell.Grid, x, y int, c cell.Cell, dst []byte, width, height, stride int, face *font.Face) {
+func (r *Rasterizer) drawCell(g *cell.Grid, x, y int, c cell.Cell, dst []byte, width, height, stride int) {
 	if c.Ch == 0 {
 		return
 	}
-	r.drawGlyphCell(c, r.wide(g, x, y), x*r.cellW, y*r.cellH, dst, width, height, stride, face)
+	r.drawGlyphCell(c, r.wide(g, x, y), x*r.cellW, y*r.cellH, dst, width, height, stride)
 }
 
-func (r *Rasterizer) drawGlyphCell(c cell.Cell, wide bool, dx, dy int, dst []byte, width, height, stride int, face *font.Face) {
+func (r *Rasterizer) drawGlyphCell(c cell.Cell, wide bool, dx, dy int, dst []byte, width, height, stride int) {
 	cellWidth, clipWidth := r.cellW, r.cellW
 	if wide {
 		cellWidth, clipWidth = 2*r.cellW, 2*r.cellW
@@ -210,7 +273,7 @@ func (r *Rasterizer) drawGlyphCell(c cell.Cell, wide bool, dx, dy int, dst []byt
 	if c.Ch == ' ' {
 		return
 	}
-	mask := r.mask(face, c.Ch)
+	mask := r.mask(c.Ch)
 	blit(dst, stride, dx, dy, width, height, mask, c.Fg, clipWidth)
 }
 
@@ -240,12 +303,50 @@ func metrics(face *font.Face, scale float32, pixelSize int) (cellW, cellH, base 
 	return cellW, cellH, base
 }
 
-func (r *Rasterizer) mask(face *font.Face, ch rune) *image.Alpha {
-	gid, ok := face.NominalGlyph(ch)
-	if !ok {
-		gid = 0
+// faceFor resolves ch to the first face that draws it, preferring the
+// primary, and caches the answer. A rune that no face draws resolves to
+// the primary's glyph 0 (the .notdef path) exactly as before. Runes served
+// by a fallback face are recorded, bounded, for diagnostics: the effect
+// author can see which glyphs leave the primary face.
+func (r *Rasterizer) faceFor(ch rune) (*font.Face, uint8) {
+	if src, ok := r.faceOf[ch]; ok {
+		return r.faces[src], src
 	}
-	key := rasterKey{gid: gid, ppem: r.ppem}
+	src := uint8(0)
+	for i, face := range r.faces {
+		if _, ok := face.NominalGlyph(ch); ok {
+			src = uint8(i)
+			break
+		}
+	}
+	if src > 0 {
+		if len(r.affected) < affectedRunesMax {
+			r.affected[ch] = src
+		} else {
+			affectedFullOnce.Do(func() {
+				slog.Warn("raster: fallback rune record is full; later fallback runes are not counted")
+			})
+		}
+	}
+	r.faceOf[ch] = src
+	return r.faces[src], src
+}
+
+// AffectedRunes lists the runes drawn through a fallback face so far, as
+// sorted 'U+XXXX' strings. Bounded; cleared when the pixel size changes.
+func (r *Rasterizer) AffectedRunes() []string {
+	out := make([]string, 0, len(r.affected))
+	for ch := range r.affected {
+		out = append(out, fmt.Sprintf("%U", ch))
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (r *Rasterizer) mask(ch rune) *image.Alpha {
+	face, src := r.faceFor(ch)
+	gid, _ := face.NominalGlyph(ch)
+	key := rasterKey{gid: gid, ppem: r.ppem, src: src}
 	if m, hit := r.cache[key]; hit {
 		return m
 	}
@@ -412,7 +513,7 @@ func mix(dst, src, cov byte) byte {
 // ponytail: 256 tiles of at most 4 KiB bound added storage to 1 MiB;
 // larger cells and new colours after the cap use the glyph path. A measured
 // need for palette turnover can replace this with bounded eviction.
-func (r *Rasterizer) tile(c cell.Cell, face *font.Face) []byte {
+func (r *Rasterizer) tile(c cell.Cell) []byte {
 	if r.cellW > 4096/4/r.cellH {
 		return nil
 	}
@@ -424,7 +525,9 @@ func (r *Rasterizer) tile(c cell.Cell, face *font.Face) []byte {
 	}
 	pixels := make([]byte, r.cellW*r.cellH*4)
 	r.fillBlack(pixels, r.cellW*4, r.cellW, r.cellH)
-	r.drawGlyphCell(c, false, 0, 0, pixels, r.cellW, r.cellH, r.cellW*4, face)
+	r.drawGlyphCell(c, false, 0, 0, pixels, r.cellW, r.cellH, r.cellW*4)
 	r.tiles[c] = pixels
 	return pixels
 }
+
+var affectedFullOnce sync.Once
