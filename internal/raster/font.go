@@ -162,3 +162,43 @@ func materialiseBundledFont() (string, error) {
 	}
 	return path, nil
 }
+
+// fallbackFontPaths returns up to rasterFallbackMax installed faces to
+// consult when primary lacks a glyph, in the same probe order as FindFont,
+// excluding primary itself. The bundled copy is never a fallback: it exists
+// so a machine with no system fonts still starts, not to second-guess the
+// face the operator chose.
+func fallbackFontPaths(primary string) []string {
+	clean := filepath.Clean(primary)
+	var out []string
+	add := func(path string) bool {
+		if filepath.Clean(path) == clean {
+			return false
+		}
+		for _, seen := range out {
+			if filepath.Clean(seen) == filepath.Clean(path) {
+				return false
+			}
+		}
+		out = append(out, path)
+		return len(out) >= rasterFallbackMax
+	}
+	for _, path := range defaultFonts {
+		if fi, err := os.Stat(path); err == nil && fi.Mode().IsRegular() {
+			if add(path) {
+				return out
+			}
+		}
+	}
+	for _, root := range defaultFontRoots {
+		for _, name := range monoFontNames {
+			path := filepath.Join(root, name)
+			if fi, err := os.Stat(path); err == nil && fi.Mode().IsRegular() {
+				if add(path) {
+					return out
+				}
+			}
+		}
+	}
+	return out
+}
