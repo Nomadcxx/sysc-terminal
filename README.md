@@ -10,9 +10,11 @@ with one process per output.
 
 ## Installation
 
-Runtime rendering needs a monospace font. The default search checks JetBrains Mono (Nerd Font
-first) under `/usr/share/fonts/TTF/`, then Noto Sans Mono under `/usr/share/fonts/noto/`.
-Use `--font /path/to/font.ttf` for another location.
+Runtime rendering needs a monospace font with braille coverage. The default search checks
+JetBrains Mono (Nerd Font first), then DejaVu Sans Mono and Noto Sans Mono, under
+`/usr/share/fonts/`, `/usr/local/share/fonts/` and the Nix store profile — matching both the
+Arch/Nix `TTF/` layout and the Debian/Ubuntu `truetype/` layout — then falls back to any font
+file found under those roots. Use `--font /path/to/font.ttf` for another location.
 
 ```bash
 GOBIN="$HOME/.local/bin" CGO_ENABLED=0 go install github.com/Nomadcxx/sysc-terminal/cmd/sysc-terminal@main

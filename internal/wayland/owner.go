@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -188,6 +191,25 @@ func NewOwner(cfg Config) (*Owner, error) {
 	return o, nil
 }
 
+// ponytail: an ordered list of braille-capable monospace faces across distro
+// layouts, then a walk of the roots; ask fontconfig (`fc-match -f %{file}
+// monospace`) if a user-configured face is ever required. Ceiling: the walk can
+// land on a mono face without braille, which paints blank effect cells.
+var fontRoots = []string{
+	"/usr/share/fonts",
+	"/usr/local/share/fonts",
+	"/run/current-system/sw/share/fonts",
+}
+
+var fontCandidates = []string{
+	"TTF/JetBrainsMonoNerdFont-Regular.ttf",
+	"TTF/JetBrainsMono-Regular.ttf",
+	"truetype/dejavu/DejaVuSansMono.ttf",
+	"truetype/noto/NotoSansMono-Regular.ttf",
+	"opentype/noto/NotoSansMono-Regular.ttf",
+	"noto/NotoSansMono-Regular.ttf",
+}
+
 func findFont(explicit string) (string, error) {
 	if explicit != "" {
 		fi, err := os.Stat(explicit)
@@ -199,18 +221,61 @@ func findFont(explicit string) (string, error) {
 		}
 		return explicit, nil
 	}
-	paths := []string{
-		"/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf",
-		"/usr/share/fonts/TTF/JetBrainsMono-Regular.ttf",
-		"/usr/share/fonts/noto/NotoSansMono-Regular.ttf",
+	tried := make([]string, 0, len(fontRoots)*len(fontCandidates))
+	for _, root := range fontRoots {
+		for _, name := range fontCandidates {
+			path := filepath.Join(root, name)
+			tried = append(tried, path)
+			if isRegularFile(path) {
+				return path, nil
+			}
+		}
 	}
-	for _, path := range paths {
-		fi, err := os.Stat(path)
-		if err == nil && fi.Mode().IsRegular() {
+	for _, root := range fontRoots {
+		if path, ok := walkMonoFont(root); ok {
 			return path, nil
 		}
 	}
-	return "", fmt.Errorf("wayland: no supported font found; tried %v", paths)
+	return "", fmt.Errorf("wayland: no supported font found; tried %v", tried)
+}
+
+func isRegularFile(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode().IsRegular()
+}
+
+func walkMonoFont(root string) (string, bool) {
+	// ponytail: prefer a "mono" name, but mono faces are not named that way
+	// (Iosevka, FiraCode, Hack), so any font file is the fallback.
+	var monoNamed, anyFont string
+	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if path != root && strings.HasPrefix(d.Name(), ".") {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".ttf", ".otf", ".ttc":
+		default:
+			return nil
+		}
+		if anyFont == "" {
+			anyFont = path
+		}
+		if strings.Contains(strings.ToLower(d.Name()), "mono") {
+			monoNamed = path
+			return fs.SkipAll
+		}
+		return nil
+	})
+	if monoNamed != "" {
+		return monoNamed, true
+	}
+	return anyFont, anyFont != ""
 }
 
 func (o *Owner) Wake() {
