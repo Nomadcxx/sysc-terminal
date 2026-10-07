@@ -18,8 +18,8 @@ func TestLayerSpecMatchesD3(t *testing.T) {
 	if s.Layer != layershell.ZwlrLayerShellV1LayerBackground {
 		t.Fatalf("layer %d, want Background", s.Layer)
 	}
-	if s.ExclusiveZone != 0 {
-		t.Fatalf("exclusive zone %d, want 0", s.ExclusiveZone)
+	if s.ExclusiveZone != -1 {
+		t.Fatalf("exclusive zone %d, want -1 so the surface stretches under panels", s.ExclusiveZone)
 	}
 	if s.Keyboard != layershell.ZwlrLayerSurfaceV1KeyboardInteractivityNone {
 		t.Fatalf("keyboard %d, want none", s.Keyboard)
