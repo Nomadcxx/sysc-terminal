@@ -167,3 +167,21 @@ func TestNewFromFileBoundsArtworkRead(t *testing.T) {
 		t.Fatal("oversized artwork was accepted")
 	}
 }
+
+func TestLogoSpinConstructAndTick(t *testing.T) {
+	for _, id := range []string{"sysc-logo", "cross-logo", "logo-morph"} {
+		e, err := New(id, "nord", 80, 24, "")
+		if err != nil {
+			t.Fatalf("%s: new: %v", id, err)
+		}
+		e.Tick()
+		e.Tick()
+		if e.Generation() != 2 {
+			t.Fatalf("%s: generation %d, want 2", id, e.Generation())
+		}
+		grid := e.Grid()
+		if grid == nil || grid.Cols != 80 || grid.Rows != 24 {
+			t.Fatalf("%s: grid %+v", id, grid)
+		}
+	}
+}

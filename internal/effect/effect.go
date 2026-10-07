@@ -222,6 +222,18 @@ func construct(id, theme string, w, h int, text string) (ticker, error) {
 	case "decrypt":
 		pal := animations.GetParticlePalette(theme)
 		return animations.NewDecryptEffect(animations.DecryptConfig{Width: w, Height: h, Text: text, Palette: pal, CiphertextColors: pal, FinalGradientStops: pal}), nil
+	case "skull":
+		return animations.NewSkullEffect(w, h, animations.GetSkullPalette(theme), theme), nil
+	case "sonar":
+		return animations.NewSonarEffect(w, h, animations.GetSkullPalette(theme), theme), nil
+	case "cracktro":
+		return animations.NewCracktroEffect(w, h, animations.GetCracktroPalette(theme), theme), nil
+	case "sysc-logo":
+		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "sysc", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
+	case "cross-logo":
+		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "cross", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
+	case "logo-morph":
+		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "sysc-cross", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
 	default:
 		return nil, fmt.Errorf("unconstructed effect %q", id)
 	}
