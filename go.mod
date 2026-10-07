@@ -5,7 +5,7 @@ go 1.26
 require github.com/Nomadcxx/sysc-wayland v0.3.1
 
 require (
-	github.com/Nomadcxx/sysc-Go v1.0.6-0.20261007133140-eacb0422edb4 // indirect
+	github.com/Nomadcxx/sysc-Go v1.0.6-0.20261007134910-cf1562a7d325 // indirect
 	github.com/charmbracelet/colorprofile v0.3.2 // indirect
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta.3.0.20250917201909-41ff0bf215ea // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20250915111650-81d4262876ef // indirect
