@@ -232,6 +232,8 @@ func construct(id, theme string, w, h int, text string) (ticker, error) {
 		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "sysc", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
 	case "cross-logo":
 		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "cross", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
+	case "justice-cross":
+		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "justice", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
 	case "logo-morph":
 		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "sysc-cross", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
 	default:

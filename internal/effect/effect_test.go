@@ -169,7 +169,7 @@ func TestNewFromFileBoundsArtworkRead(t *testing.T) {
 }
 
 func TestLogoSpinConstructAndTick(t *testing.T) {
-	for _, id := range []string{"sysc-logo", "cross-logo", "logo-morph"} {
+	for _, id := range []string{"sysc-logo", "cross-logo", "justice-cross", "logo-morph"} {
 		e, err := New(id, "nord", 80, 24, "")
 		if err != nil {
 			t.Fatalf("%s: new: %v", id, err)
