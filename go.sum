@@ -8,6 +8,8 @@ github.com/Nomadcxx/sysc-Go v1.0.6-0.20261007130640-1c7cfca36d82 h1:KyXL8SlZYRnT
 github.com/Nomadcxx/sysc-Go v1.0.6-0.20261007130640-1c7cfca36d82/go.mod h1:aVjiviCJEgKIQy0AZ2uQbf+V36JG8ZQLDO4ZtZ9wcQk=
 github.com/Nomadcxx/sysc-Go v1.0.6-0.20261007131754-777387e54549 h1:HdPkfaXhWBTf8jvJpOyDU70vQnTzwFJ+OtYCF31dtpw=
 github.com/Nomadcxx/sysc-Go v1.0.6-0.20261007131754-777387e54549/go.mod h1:aVjiviCJEgKIQy0AZ2uQbf+V36JG8ZQLDO4ZtZ9wcQk=
+github.com/Nomadcxx/sysc-Go v1.0.6-0.20261007133140-eacb0422edb4 h1:U9ggtIJ7WtG8aJwyA3jfEKHRC7KVKeJH6/wm0cvAiaU=
+github.com/Nomadcxx/sysc-Go v1.0.6-0.20261007133140-eacb0422edb4/go.mod h1:aVjiviCJEgKIQy0AZ2uQbf+V36JG8ZQLDO4ZtZ9wcQk=
 github.com/Nomadcxx/sysc-wayland v0.3.1 h1:bpo91OQOlWv5rvM4sPueqwEYHYSTIlIKO6KmgGQyU/0=
 github.com/Nomadcxx/sysc-wayland v0.3.1/go.mod h1:ZNAe41EM7R5G2KA55jqMPotAvrjVWcMq21BV69gROKA=
 github.com/charmbracelet/colorprofile v0.3.2 h1:9J27WdztfJQVAQKX2WOlSSRB+5gaKqqITmrvb1uTIiI=
