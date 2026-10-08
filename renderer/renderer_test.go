@@ -176,3 +176,23 @@ func TestRendererRejectsUndersizedTextGeometry(t *testing.T) {
 		t.Fatal("undersized header accepted")
 	}
 }
+
+func TestRendererShellPaletteCatalog(t *testing.T) {
+	for _, name := range []string{"rose-pine", "kanagawa", "noctalia", "eldritch-abyss", "void", "red", "cyan", "coral", "pink"} {
+		t.Run(name, func(t *testing.T) {
+			if err := Validate("matrix", name); err != nil {
+				t.Fatal(err)
+			}
+			r, err := New(Config{Effect: "matrix", Palette: name, Width: 320, Height: 240, PixelSize: 12})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := r.Step(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := r.Draw(make([]byte, 320*240*4), 320*4, nil); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
