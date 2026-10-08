@@ -3,7 +3,7 @@ module github.com/Nomadcxx/sysc-terminal
 go 1.26
 
 require (
-	github.com/Nomadcxx/sysc-Go v1.0.6-0.20261008011707-798d897d33ab
+	github.com/Nomadcxx/sysc-Go v1.0.6-0.20261008135617-dfe85550616b
 	github.com/Nomadcxx/sysc-wayland v0.3.1
 	github.com/go-text/typesetting v0.3.5-0.20260729084153-ddb7ff96ad4d
 	github.com/mattn/go-runewidth v0.0.16
