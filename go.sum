@@ -1,5 +1,5 @@
-github.com/Nomadcxx/sysc-Go v1.0.6-0.20261008011707-798d897d33ab h1:3OPbPxpCsulGj63ldPL1dbvW6h+F3vIyOAtKZfd8Iz8=
-github.com/Nomadcxx/sysc-Go v1.0.6-0.20261008011707-798d897d33ab/go.mod h1:aVjiviCJEgKIQy0AZ2uQbf+V36JG8ZQLDO4ZtZ9wcQk=
+github.com/Nomadcxx/sysc-Go v1.0.6-0.20261008135617-dfe85550616b h1:DhAlWLoVN7giWPQtncKKejYU8P18wY9F6sk6uvHrgRA=
+github.com/Nomadcxx/sysc-Go v1.0.6-0.20261008135617-dfe85550616b/go.mod h1:aVjiviCJEgKIQy0AZ2uQbf+V36JG8ZQLDO4ZtZ9wcQk=
 github.com/Nomadcxx/sysc-wayland v0.3.1 h1:bpo91OQOlWv5rvM4sPueqwEYHYSTIlIKO6KmgGQyU/0=
 github.com/Nomadcxx/sysc-wayland v0.3.1/go.mod h1:ZNAe41EM7R5G2KA55jqMPotAvrjVWcMq21BV69gROKA=
 github.com/charmbracelet/colorprofile v0.3.2 h1:9J27WdztfJQVAQKX2WOlSSRB+5gaKqqITmrvb1uTIiI=
