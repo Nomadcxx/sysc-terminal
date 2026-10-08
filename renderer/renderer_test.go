@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/Nomadcxx/sysc-terminal/internal/cell"
 	"github.com/Nomadcxx/sysc-terminal/internal/effect"
+	"strings"
 	"testing"
 )
 
@@ -124,5 +125,54 @@ func TestRendererCatalogRejectsTextAndUnknown(t *testing.T) {
 		if err := Validate(id, "nord"); err != nil {
 			t.Fatal(id, err)
 		}
+	}
+}
+
+func TestRendererTextEffectsFitAHeader(t *testing.T) {
+	if len(TextEffects()) == 0 {
+		t.Fatal("text catalogue is empty")
+	}
+	for _, name := range TextEffects() {
+		t.Run(name, func(t *testing.T) {
+			r, err := New(Config{Effect: name, Palette: "eldritch", Text: "SYSC\nLOCKED", Width: 480, Height: 96, PixelSize: 10})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.effect.EffectHeight() >= effect.MinimumRows {
+				t.Fatal("header is forced into wallpaper geometry")
+			}
+			dst := make([]byte, 480*96*4)
+			seen := false
+			for range 80 {
+				if err = r.Step(); err != nil {
+					t.Fatal(err)
+				}
+				if _, err = r.Draw(dst, 480*4, nil); err != nil {
+					t.Fatal(err)
+				}
+				for i := 0; i < len(dst); i += 4 {
+					if dst[i] != 0 || dst[i+1] != 0 || dst[i+2] != 0 {
+						seen = true
+					}
+				}
+			}
+			if !seen {
+				t.Fatal("header frames are blank")
+			}
+		})
+	}
+}
+
+func TestRendererRejectsUnsafeArtwork(t *testing.T) {
+	for _, text := range []string{"bad\x1b[31m", "bad\x00", string([]byte{255}), strings.Repeat("x", (64<<10)+1)} {
+		if _, err := New(Config{Effect: "print", Palette: "nord", Text: text, Width: 480, Height: 96}); err == nil {
+			t.Fatal("unsafe artwork accepted")
+		}
+	}
+}
+
+func TestRendererRejectsUndersizedTextGeometry(t *testing.T) {
+	if _, err := New(Config{Effect: "pour", Palette: "nord", Text: "SYSC", Width: 320, Height: 1}); err == nil {
+		t.Fatal("undersized header accepted")
 	}
 }

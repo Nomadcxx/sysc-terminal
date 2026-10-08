@@ -9,11 +9,14 @@ import (
 	"github.com/Nomadcxx/sysc-terminal/internal/effect"
 	"github.com/Nomadcxx/sysc-terminal/internal/raster"
 	"slices"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 type Config struct {
-	Effect, Palette, Font    string
-	Width, Height, PixelSize int
+	Effect, Palette, Font, Text string
+	Width, Height, PixelSize    int
 }
 
 // Frame is immutable history for a specific caller-owned pixel buffer.
@@ -29,6 +32,7 @@ type Renderer struct {
 	width, height int
 	geometry      uint64
 	needsStep     bool
+	textSurface   bool
 }
 
 func Effects() []string {
@@ -41,6 +45,29 @@ func Effects() []string {
 	}
 	return out
 }
+
+// TextEffects lists artwork-dependent effects from the authoritative library.
+func TextEffects() []string { return slices.Clone(animations.GetTextBasedEffects()) }
+
+// ValidateText accepts bounded literal artwork, without terminal controls.
+func ValidateText(id, palette, text string) error {
+	if !slices.Contains(TextEffects(), id) {
+		return fmt.Errorf("unknown text effect %q", id)
+	}
+	if animations.GetThemeMetadata(palette) == nil {
+		return fmt.Errorf("unknown palette %q", palette)
+	}
+	if len(text) > 64<<10 || !utf8.ValidString(text) || strings.TrimSpace(text) == "" {
+		return fmt.Errorf("artwork exceeds text budget or is empty")
+	}
+	for _, r := range text {
+		if unicode.IsControl(r) && r != '\n' && r != '\t' {
+			return fmt.Errorf("artwork contains terminal controls")
+		}
+	}
+	return nil
+}
+
 func Palettes() []string { return slices.Clone(animations.GetThemeNames()) }
 func Validate(id, palette string) error {
 	if !slices.Contains(Effects(), id) {
@@ -52,7 +79,13 @@ func Validate(id, palette string) error {
 	return nil
 }
 func New(cfg Config) (*Renderer, error) {
-	if err := Validate(cfg.Effect, cfg.Palette); err != nil {
+	var err error
+	if cfg.Text != "" {
+		err = ValidateText(cfg.Effect, cfg.Palette, cfg.Text)
+	} else {
+		err = Validate(cfg.Effect, cfg.Palette)
+	}
+	if err != nil {
 		return nil, err
 	}
 	if cfg.PixelSize == 0 {
@@ -73,17 +106,17 @@ func New(cfg Config) (*Renderer, error) {
 		return nil, err
 	}
 	cw, ch := rz.CellSize()
-	cols, rows, err := geometry(cfg.Width, cfg.Height, cw, ch)
+	cols, rows, err := geometry(cfg.Width, cfg.Height, cw, ch, cfg.Text != "")
 	if err != nil {
 		return nil, err
 	}
-	fx, err := effect.New(cfg.Effect, cfg.Palette, cols, rows, "")
+	fx, err := effect.New(cfg.Effect, cfg.Palette, cols, rows, cfg.Text)
 	if err != nil {
 		return nil, err
 	}
-	return &Renderer{effect: fx, raster: rz, width: cfg.Width, height: cfg.Height, geometry: 1, needsStep: true}, nil
+	return &Renderer{effect: fx, raster: rz, width: cfg.Width, height: cfg.Height, geometry: 1, needsStep: true, textSurface: cfg.Text != ""}, nil
 }
-func geometry(w, h, cw, ch int) (int, int, error) {
+func geometry(w, h, cw, ch int, textSurface bool) (int, int, error) {
 	_, total, err := raster.BufferSize(w, h, 1)
 	if err != nil {
 		return 0, 0, err
@@ -92,7 +125,12 @@ func geometry(w, h, cw, ch int) (int, int, error) {
 	if total > 256<<20 || cw <= 0 || ch <= 0 {
 		return 0, 0, fmt.Errorf("renderer geometry exceeds budget")
 	}
-	cols, rows := max(effect.MinimumCols, w/cw), max(effect.MinimumRows, h/ch)
+	cols, rows := max(effect.MinimumCols, w/cw), max(1, h/ch)
+	if !textSurface {
+		rows = max(effect.MinimumRows, rows)
+	} else if rows < 4 {
+		return 0, 0, fmt.Errorf("text surface requires at least four rows")
+	}
 	if cols > cell.MaxGridCells/rows {
 		return 0, 0, fmt.Errorf("renderer grid exceeds budget")
 	}
@@ -114,7 +152,7 @@ func (r *Renderer) Resize(width, height int) error {
 		return nil
 	}
 	cw, ch := r.raster.CellSize()
-	cols, rows, err := geometry(width, height, cw, ch)
+	cols, rows, err := geometry(width, height, cw, ch, r.textSurface)
 	if err != nil {
 		return err
 	}

@@ -41,8 +41,11 @@ func New(id, theme string, cols, rows int, text string) (*Effect, error) {
 	if cols < MinimumCols {
 		cols = MinimumCols
 	}
-	if rows < MinimumRows {
-		rows = MinimumRows
+	rows = max(1, rows)
+	if !requiresText(id) {
+		rows = max(MinimumRows, rows)
+	} else {
+		rows = max(4, rows)
 	}
 	fx, err := construct(id, theme, cols, rows, text)
 	if err != nil {
@@ -126,8 +129,11 @@ func (e *Effect) Resize(cols, rows int) error {
 	if cols < MinimumCols {
 		cols = MinimumCols
 	}
-	if rows < MinimumRows {
-		rows = MinimumRows
+	rows = max(1, rows)
+	if !requiresText(e.id) {
+		rows = max(MinimumRows, rows)
+	} else {
+		rows = max(4, rows)
 	}
 	e.w, e.h = cols, rows
 	if r, ok := e.fx.(resizer); ok {
@@ -215,13 +221,13 @@ func construct(id, theme string, w, h int, text string) (ticker, error) {
 		}), nil
 	case "pour":
 		pal := animations.GetParticlePalette(theme)
-		return animations.NewPourEffect(animations.PourConfig{Width: w, Height: h, Text: text, FinalGradientStops: pal}), nil
+		return animations.NewPourEffect(animations.PourConfig{Width: w, Height: h, Text: text, PourDirection: "down", PourSpeed: 4, MovementSpeed: .5, StartingColor: last(pal), FinalGradientStops: pal, FinalGradientSteps: 10, FinalGradientFrames: 2}), nil
 	case "print":
 		pal := animations.GetParticlePalette(theme)
 		return animations.NewPrintEffect(animations.PrintConfig{Width: w, Height: h, Text: text, GradientStops: pal}), nil
 	case "decrypt":
 		pal := animations.GetParticlePalette(theme)
-		return animations.NewDecryptEffect(animations.DecryptConfig{Width: w, Height: h, Text: text, Palette: pal, CiphertextColors: pal, FinalGradientStops: pal}), nil
+		return animations.NewDecryptEffect(animations.DecryptConfig{Width: w, Height: h, Text: text, Palette: pal, TypingSpeed: 4, CiphertextColors: pal, FinalGradientStops: pal, FinalGradientSteps: 10}), nil
 	case "skull":
 		return animations.NewSkullEffect(w, h, animations.GetSkullPalette(theme), theme), nil
 	case "sonar":
