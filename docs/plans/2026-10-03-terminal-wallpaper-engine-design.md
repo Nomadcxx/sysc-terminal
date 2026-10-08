@@ -147,10 +147,12 @@ blits plus tint. Requirements:
   wallpaper size. Without cache, the second draw replaces the masks and the
   check fails.
 
-Font: first existing path among config `font_path`, then
-`/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf`,
-`/usr/share/fonts/TTF/JetBrainsMono-Regular.ttf`,
-`/usr/share/fonts/noto/NotoSansMono-Regular.ttf`. Missing font = hard
+Font: first existing path among config `font_path`, then an ordered list of
+braille-capable monospace faces under `/usr/share/fonts/`,
+`/usr/local/share/fonts/` and `/run/current-system/sw/share/fonts` — JetBrains
+Mono (Nerd Font first), DejaVu Sans Mono, Noto Sans Mono — covering both the
+Arch/Nix `TTF/` and Debian/Ubuntu `truetype/` layouts, then any font file
+under those roots. Missing font = hard
 start error (honest unavailable), not crash loop. No fontconfig CGO. Missing
 glyphs: replacement `.notdef` at width 1 cell. Combining marks: not combined;
 documented limit. East-Asian wide runes: if `uniseg`/`runewidth` reports width
