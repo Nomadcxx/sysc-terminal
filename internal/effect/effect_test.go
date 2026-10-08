@@ -183,5 +183,18 @@ func TestLogoSpinConstructAndTick(t *testing.T) {
 		if grid == nil || grid.Cols != 80 || grid.Rows != 24 {
 			t.Fatalf("%s: grid %+v", id, grid)
 		}
+		// A frame that ticks cleanly but paints nothing would still pass the
+		// assertions above, so require actual braille dots to land in the grid.
+		dots := 0
+		for y := 0; y < grid.Rows; y++ {
+			for x := 0; x < grid.Cols; x++ {
+				if ch := grid.At(x, y).Ch; ch >= 0x2800 && ch <= 0x28FF {
+					dots++
+				}
+			}
+		}
+		if dots == 0 {
+			t.Errorf("%s: frame carried no braille dots", id)
+		}
 	}
 }
