@@ -22,10 +22,13 @@ type Spec struct {
 	EmptyInputRegion bool
 }
 
+// Exclusive zone -1 is the wallpaper contract: the compositor extends the
+// surface to every anchored edge instead of insetting it around a panel, so
+// the effect paints under the bar and frosted blur has pixels to sample.
 var LayerSpec = Spec{
 	Namespace:        "sysc-terminal",
 	Layer:            layershell.ZwlrLayerShellV1LayerBackground,
-	ExclusiveZone:    0,
+	ExclusiveZone:    -1,
 	Keyboard:         layershell.ZwlrLayerSurfaceV1KeyboardInteractivityNone,
 	Anchor:           uint32(layershell.ZwlrLayerSurfaceV1AnchorTop | layershell.ZwlrLayerSurfaceV1AnchorRight | layershell.ZwlrLayerSurfaceV1AnchorBottom | layershell.ZwlrLayerSurfaceV1AnchorLeft),
 	EmptyInputRegion: true,

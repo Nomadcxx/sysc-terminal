@@ -42,10 +42,10 @@ Per mapped output:
 | Namespace | `sysc-terminal` |
 | Anchor | top, right, bottom, left |
 | Size | 0×0 (compositor configures) |
-| Exclusive zone | 0 |
+| Exclusive zone | -1 (stretch under panels; a wallpaper does not reserve or avoid) |
 | Keyboard | none |
 | Input region | empty `wl_region` (not nil: nil means whole surface takes input) |
-| Coverage | output configured size; no exclusive reservation |
+| Coverage | output configured size; extends under panels |
 | On compositor error or display disconnect | Unmap what exists, report, exit non-zero |
 
 No Bottom (depth clock lives there, namespace
@@ -497,5 +497,6 @@ First vertical slice: `fire` (no text). Second: `fire-text` or `matrix-art`
 
 The owner approved desktop Experiment B, Task 9 live qualification, and
 installation on 2026-10-04. Laptop and two-output qualification remain
-separate gates. Exclusive zone 0, the v1.0.3 pin, blank effect preview, and
+separate gates. Exclusive zone -1 (stretch under panels, so frosted bars
+sample effect pixels), the v1.0.3 pin, blank effect preview, and
 refusal below 21×24 cells are settled design decisions.

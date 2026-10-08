@@ -208,7 +208,9 @@ Idle: no `IdleService` in current shell source (grep empty). Session suspend = `
 | gSlapper extension | No cell path | Shell already owns for image/video | GPL-3 C | Reject |
 | Upstream `RenderCells` on every sysc-Go effect | Cleaner long-term | Cross-repo release gate before wallpaper ships | MIT | Optional later; not required v1 |
 
-**Recommendation:** small Go process in this repository, one instance per output, layer-shell Background, empty input region, exclusive zone **0** (commission; gSlapper uses -1 and live-proven, but 0 = specified contract), keyboard none, namespace `sysc-terminal`. Consume sysc-Go `Render()` through bounded SGR interpreter (reuse `interpret()` approach proven in cellstyle tests). Rasterise with monospace font via `go-text/typesetting` (already used by shell; do not import shell). sysc-shell grows `KindEffect`, supervises binary like gSlapper.
+**Recommendation:** small Go process in this repository, one instance per output, layer-shell Background, empty input region, exclusive zone **-1**, keyboard none, namespace `sysc-terminal`. Consume sysc-Go `Render()` through bounded SGR interpreter (reuse `interpret()` approach proven in cellstyle tests). Rasterise with monospace font via `go-text/typesetting` (already used by shell; do not import shell). sysc-shell grows `KindEffect`, supervises binary like gSlapper.
+
+**Superseded (2026-10-07):** this report commissioned exclusive zone **0** ("specified contract", against gSlapper's live-proven **-1**). Zone 0 makes the compositor inset the Background surface around the shell bar's positive exclusive zone, so the effect stops at the bar edge and frosted blur samples an empty strip. The wallpaper contract is **-1**: stretch under panels. See issue #6.
 
 Small sysc-Go `RenderCells` API *not* required to start. Assess if ANSI subset becomes tax; do not rewrite 17 `Render` methods first.
 

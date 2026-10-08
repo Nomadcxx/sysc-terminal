@@ -281,10 +281,10 @@ Draw at integer cell boxes. Background fill first.
 **Files:**
 - Create: `internal/wayland/owner.go` (dispatch loop, shm, layer surface)
 - Create: `internal/wayland/surface.go`
-- Test: `internal/wayland/surface_test.go` (protocol planning tests without compositor: exclusive zone 0, keyboard none, empty input, namespace)
+- Test: `internal/wayland/surface_test.go` (protocol planning tests without compositor: exclusive zone -1, keyboard none, empty input, namespace)
 - Modify: `cmd/sysc-terminal/main.go`
 
-**Step 1:** Table check that layer-spec constants equal D3 contract — namespace `sysc-terminal`, layer Background (0), exclusive zone 0, keyboard none, all four anchors, size 0×0 — plus check grid geometry rejects int32-overflowing byte size.
+**Step 1:** Table check that layer-spec constants equal D3 contract — namespace `sysc-terminal`, layer Background (0), exclusive zone -1, keyboard none, all four anchors, size 0×0 — plus check grid geometry rejects int32-overflowing byte size.
 
 Previous revision said "fake host records `SetInputRegion` empty, `SetExclusiveZone(0)`". That requires interface design never specifies, and single fake is speculative abstraction whose only purpose is making one check look thorough. Real protocol work happens at live gate (Experiment B / Task 9), where Niri itself is oracle and reports layer, namespace, keyboard interactivity. So: constants checked headlessly, behaviour checked live. If owner loop happens to take interface anyway, record calls there — do not build seam to host fake.
 
