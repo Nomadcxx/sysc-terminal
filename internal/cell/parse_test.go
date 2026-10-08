@@ -2,11 +2,16 @@ package cell
 
 import (
 	"image/color"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/Nomadcxx/sysc-Go/animations"
 )
+
+// ansiRE matches CSI escape sequences so a rendered line can be judged on its
+// glyphs rather than its SGR codes.
+var ansiRE = regexp.MustCompile("\x1b\\[[0-9;?]*[a-zA-Z]")
 
 func TestFireFrameFillsGrid(t *testing.T) {
 	pal := animations.GetFirePalette("nord")
@@ -14,7 +19,8 @@ func TestFireFrameFillsGrid(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		fx.Update()
 	}
-	g, err := Parse(fx.Render(), 80, 24)
+	frame := fx.Render()
+	g, err := Parse(frame, 80, 24)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -39,14 +45,27 @@ func TestFireFrameFillsGrid(t *testing.T) {
 	if coloured != lit {
 		t.Fatalf("%d of %d lit cells carry no 38;2 colour; SGR is being lost", lit-coloured, lit)
 	}
-	row0lit := 0
-	for x := 0; x < g.Cols; x++ {
-		if c := g.At(x, 0); c.Ch != ' ' && c.Ch != 0 {
-			row0lit++
+	// Row fidelity is checked against the frame the effect actually emitted,
+	// not against a fixed row: fire reads the global unseeded math/rand, so how
+	// far it has climbed by frame 5 varies per process and a hardcoded row made
+	// this test fail at random.
+	wantRows := 0
+	for _, line := range strings.Split(frame, "\n") {
+		if strings.TrimSpace(ansiRE.ReplaceAllString(line, "")) != "" {
+			wantRows++
 		}
 	}
-	if row0lit == 0 {
-		t.Fatal("row 0 is all spaces; fire is not bottom-anchored in the first frames")
+	gotRows := 0
+	for y := 0; y < g.Rows; y++ {
+		for x := 0; x < g.Cols; x++ {
+			if c := g.At(x, y); c.Ch != ' ' && c.Ch != 0 {
+				gotRows++
+				break
+			}
+		}
+	}
+	if gotRows != wantRows {
+		t.Errorf("grid has %d rows with content, frame has %d; parser is shifting rows", gotRows, wantRows)
 	}
 }
 
