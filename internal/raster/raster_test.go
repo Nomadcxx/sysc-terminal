@@ -212,7 +212,8 @@ func TestSetPixelSizeUpdatesCellMetrics(t *testing.T) {
 
 func TestSecondFrameReusesGlyphMasks(t *testing.T) {
 	f := newFixture(t)
-	g := f.solidGrid('▒', 100)
+	// A font-drawn glyph; block elements bypass this cache for geometric masks.
+	g := f.solidGrid('@', 100)
 	f.Draw(g)
 	cached := make(map[rasterKey]*image.Alpha, len(f.rz.cache))
 	for key, mask := range f.rz.cache {
@@ -377,5 +378,60 @@ func TestOpenRejectsFontOverMemoryLimit(t *testing.T) {
 	_, err = Open(f.Name(), 12)
 	if err == nil || !strings.Contains(err.Error(), "exceeds 32 MiB") {
 		t.Fatalf("oversized font error = %v", err)
+	}
+}
+
+// Block art tiles only if block elements fill their cell exactly, the way
+// kitty draws them; font glyphs leave seams between rows and columns.
+func TestBlockElementsTileWithoutSeams(t *testing.T) {
+	rz := openTestFont(t)
+	cw, ch := rz.CellSize()
+	draw := func(art string, cols, rows int) []byte {
+		t.Helper()
+		g, err := cell.Parse(art, cols, rows)
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		w, h := cols*cw, rows*ch
+		stride, total, err := BufferSize(w, h, 1)
+		if err != nil {
+			t.Fatalf("size: %v", err)
+		}
+		dst := make([]byte, total)
+		if err := rz.Draw(g, dst, w, h, stride); err != nil {
+			t.Fatalf("draw: %v", err)
+		}
+		return dst
+	}
+	red := "\033[38;2;255;0;0m"
+	full := draw(red+"██\n"+red+"██", 2, 2)
+	for i := 0; i < len(full); i += 4 {
+		if full[i+2] != 255 {
+			t.Fatalf("full block leaves a seam at pixel %d", i/4)
+		}
+	}
+	// The upper half block covers exactly the top half of its cell.
+	half := draw(red+"▀", 1, 1)
+	for y := 0; y < ch; y++ {
+		want := byte(0)
+		if y < ch/2 {
+			want = 255
+		}
+		for x := 0; x < cw; x++ {
+			if got := half[(y*cw+x)*4+2]; got != want {
+				t.Fatalf("upper half block row %d col %d = %d, want %d", y, x, got, want)
+			}
+		}
+	}
+	// A horizontal light line spans the cell edge to edge so lines join.
+	line := draw(red+"──", 2, 1)
+	for x := 0; x < 2*cw; x++ {
+		lit := false
+		for y := 0; y < ch; y++ {
+			lit = lit || line[(y*2*cw+x)*4+2] == 255
+		}
+		if !lit {
+			t.Fatalf("horizontal line breaks at column %d", x)
+		}
 	}
 }
