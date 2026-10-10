@@ -34,6 +34,9 @@ func (r *Rasterizer) blockMask(ch rune) *image.Alpha {
 	if m, ok := r.blocks[ch]; ok {
 		return m
 	}
+	if _, box := lightBox[ch]; !box && (ch < '▀' || ch > '▟') {
+		return nil // ordinary glyphs take the font path without allocating
+	}
 	w, h := r.cellW, r.cellH
 	m := image.NewAlpha(image.Rect(0, 0, w, h))
 	fill := func(rect image.Rectangle, a uint8) {

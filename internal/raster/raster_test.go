@@ -403,6 +403,9 @@ func TestBlockElementsTileWithoutSeams(t *testing.T) {
 		}
 		return dst
 	}
+	if rz.blockMask('@') != nil || testing.AllocsPerRun(100, func() { rz.blockMask('@') }) != 0 {
+		t.Fatal("ordinary glyphs must take the font path without allocating")
+	}
 	red := "\033[38;2;255;0;0m"
 	full := draw(red+"██\n"+red+"██", 2, 2)
 	for i := 0; i < len(full); i += 4 {
