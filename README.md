@@ -1,12 +1,42 @@
-![sysc-terminal](assets/wordmark.png)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/wordmark.png">
+    <img src="assets/wordmark-light.png" alt="sysc-terminal" height="64">
+  </picture>
+</p>
+
 
 Live sysc-Go terminal effects as a Wayland wallpaper. Runs on Niri's background layer,
 with one process per output.
+
+<p align="center">
+  <img src="assets/effects.webp" alt="sysc-terminal effects running as a Wayland wallpaper" width="800"><br>
+  <sub>Ten effects, each running as the desktop wallpaper. <a href="assets/effects.mp4">Full-quality video</a></sub>
+</p>
 
 ## Quick Links
 
 - [Documentation](#documentation)
 - [The sysc ecosystem](https://github.com/Nomadcxx/sysc-shell/blob/main/docs/ecosystem.md)
+
+## Screenshots
+
+Each effect running as the wallpaper under sysc-shell, in a different theme.
+
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="assets/screens/term-fire-eldritch.webp" alt="Fire, Eldritch" width="396"><br><sub>Fire, Eldritch</sub></td>
+    <td align="center" valign="top"><img src="assets/screens/term-matrix-nord.webp" alt="Matrix, Nord" width="396"><br><sub>Matrix, Nord</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="assets/screens/term-rain-tokyo-night.webp" alt="Rain, Tokyo Night" width="396"><br><sub>Rain, Tokyo Night</sub></td>
+    <td align="center" valign="top"><img src="assets/screens/term-beams-dracula.webp" alt="Beams, Dracula" width="396"><br><sub>Beams, Dracula</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="assets/screens/term-aquarium-catppuccin.webp" alt="Aquarium, Catppuccin" width="396"><br><sub>Aquarium, Catppuccin</sub></td>
+    <td align="center" valign="top"><img src="assets/screens/term-fireworks-gruvbox.webp" alt="Fireworks, Gruvbox" width="396"><br><sub>Fireworks, Gruvbox</sub></td>
+  </tr>
+</table>
 
 ## Installation
 
