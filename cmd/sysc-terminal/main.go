@@ -36,7 +36,7 @@ func parseArgs(args []string) (commandLine, error) {
 	parsed.owner.Theme = "nord"
 	fs := flag.NewFlagSet("sysc-terminal", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	fs.Usage = func() { fmt.Fprint(os.Stdout, usage) }
+	fs.Usage = func() { fmt.Fprint(os.Stdout, help(usage)) }
 	fs.StringVar(&parsed.socket, "I", "", "control socket path")
 	fs.StringVar(&parsed.socket, "ipc-socket", "", "control socket path")
 	fs.StringVar(&parsed.owner.Output, "output", "", "output connector name")
@@ -74,7 +74,7 @@ func run(args []string) error {
 		return err
 	}
 	if parsed.help {
-		fmt.Fprint(os.Stdout, usage)
+		fmt.Fprint(os.Stdout, help(usage))
 		return nil
 	}
 	if parsed.list {
