@@ -73,10 +73,7 @@ func (r *Rasterizer) blockMask(ch rune) *image.Alpha {
 			}
 		}
 	default:
-		arms, ok := lightBox[ch]
-		if !ok {
-			return nil
-		}
+		arms := lightBox[ch] // the guard above admits only light box runes here
 		t := max(1, h/16)
 		cx, cy := (w-t)/2, (h-t)/2
 		for bit, arm := range [4]image.Rectangle{
