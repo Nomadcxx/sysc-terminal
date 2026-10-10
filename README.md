@@ -9,10 +9,9 @@
 Live sysc-Go terminal effects as a Wayland wallpaper. Runs on Niri's background layer,
 with one process per output.
 
-<p align="center">
-  <img src="assets/effects.webp" alt="sysc-terminal effects running as a Wayland wallpaper under the sysc-shell bar" width="900"><br>
-  <sub>Six effects running as the desktop wallpaper, with the sysc-shell bar on top. <a href="assets/effects.mp4">Full-quality video (1080p, 30 s)</a></sub>
-</p>
+https://github.com/user-attachments/assets/033a17d2-81f3-4323-a6b7-c08d3fcff04e
+
+<p align="center"><sub>Six effects running as the desktop wallpaper, with the sysc-shell bar on top. <a href="assets/effects.mp4">Download the 1080p file</a> (30 s).</sub></p>
 
 ## Quick Links
 
