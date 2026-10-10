@@ -16,6 +16,7 @@ with one process per output.
 
 ## Quick Links
 
+- [Documentation site](https://nomadcxx.github.io/sysc/docs/components/sysc-terminal/)
 - [Documentation](#documentation)
 - [The sysc ecosystem](https://github.com/Nomadcxx/sysc-shell/blob/main/docs/ecosystem.md)
 
