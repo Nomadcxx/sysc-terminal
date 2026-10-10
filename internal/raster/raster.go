@@ -49,6 +49,8 @@ type Rasterizer struct {
 	order []rasterKey
 	black []byte
 	tiles map[cell.Cell][]byte
+	// blocks holds the geometric block-element masks for the current size.
+	blocks map[rune]*image.Alpha
 
 	faceOf   map[rune]uint8 // resolved face per rune
 	affected map[rune]uint8 // runes that needed a fallback face
@@ -180,6 +182,7 @@ func (r *Rasterizer) SetPixelSize(pixelSize int) error {
 	r.cache = make(map[rasterKey]*image.Alpha)
 	r.order = nil
 	r.tiles = make(map[cell.Cell][]byte)
+	r.blocks = nil
 	r.faceOf = make(map[rune]uint8)
 	r.affected = make(map[rune]uint8)
 	return nil
@@ -344,6 +347,9 @@ func (r *Rasterizer) AffectedRunes() []string {
 }
 
 func (r *Rasterizer) mask(ch rune) *image.Alpha {
+	if m := r.blockMask(ch); m != nil {
+		return m
+	}
 	face, src := r.faceFor(ch)
 	gid, _ := face.NominalGlyph(ch)
 	key := rasterKey{gid: gid, ppem: r.ppem, src: src}
