@@ -58,6 +58,8 @@ JetBrains Mono (Nerd Font first), then DejaVu Sans Mono and Noto Sans Mono, unde
 Arch/Nix `TTF/` layout and the Debian/Ubuntu `truetype/` layout — then falls back to any font
 file found under those roots. Use `--font /path/to/font.ttf` for another location.
 
+### Go installation
+
 ```bash
 GOBIN="$HOME/.local/bin" CGO_ENABLED=0 go install github.com/Nomadcxx/sysc-terminal/cmd/sysc-terminal@main
 export PATH="$HOME/.local/bin:$PATH"
@@ -67,6 +69,20 @@ sysc-terminal --list
 Keep `~/.local/bin` on the PATH of the shell service, then restart sysc-shell so it probes the
 catalog. In sysc-shell, open Terminal Art from the Control Centre or Settings, choose an effect and
 palette, and apply it to an output.
+
+### AUR
+
+On Arch, install [sysc-terminal](https://aur.archlinux.org/packages/sysc-terminal) with
+your AUR helper:
+
+```sh
+yay -S sysc-terminal
+```
+
+The package includes the default monospace font. Restart sysc-shell, then choose
+an effect from Terminal Art in Settings.
+
+[Documentation](https://nomadcxx.github.io/sysc/docs/).
 
 ## Usage
 
