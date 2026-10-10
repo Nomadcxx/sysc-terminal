@@ -9,9 +9,9 @@
 Live sysc-Go terminal effects as a Wayland wallpaper. Runs on Niri's background layer,
 with one process per output.
 
-https://github.com/user-attachments/assets/033a17d2-81f3-4323-a6b7-c08d3fcff04e
+https://github.com/user-attachments/assets/8c4d2b78-3adb-4824-9a22-f3f14c2bffe1
 
-<p align="center"><sub>Six effects running as the desktop wallpaper, with the sysc-shell bar on top. <a href="assets/effects.mp4">Download the 1080p file</a> (30 s).</sub></p>
+<p align="center"><sub>sysc-terminal as the desktop wallpaper, in Tokyo Night. Settings → Terminal Art, pick the cross-logo effect, launch terminals from the launcher, then open a plugin and the system monitor. The bar is sysc-shell's, themed to match.</sub></p>
 
 ## Quick Links
 
@@ -19,7 +19,19 @@ https://github.com/user-attachments/assets/033a17d2-81f3-4323-a6b7-c08d3fcff04e
 - [Documentation](#documentation)
 - [The sysc ecosystem](https://github.com/Nomadcxx/sysc-shell/blob/main/docs/ecosystem.md)
 
-## Screenshots
+## More themes
+
+The shell takes the effect's theme, so the bar, window borders and terminals follow it.
+
+https://github.com/user-attachments/assets/f6de15a4-4a31-4af3-83de-4644d6009512
+
+<p align="center"><sub>The sysc-logo effect in Rama.</sub></p>
+
+https://github.com/user-attachments/assets/74784eba-cb6f-4b17-94ce-fc7cb8732c7a
+
+<p align="center"><sub>The logo-morph effect in Dracula.</sub></p>
+
+## Other effects
 
 Each effect running as the wallpaper under sysc-shell, in a different theme.
 
