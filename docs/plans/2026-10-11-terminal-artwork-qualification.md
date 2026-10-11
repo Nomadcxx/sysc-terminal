@@ -50,9 +50,9 @@ A separate full ten-minute interval after 60 s warmup allows at least one comple
 
 The measured average active CPU was about 4.4%, 9.4% and 12.2% of one core, respectively. This run used the reviewed runtime source through a temporary local-library modfile; final-pin named checks/build and six CPU gates independently passed. The merged library's runtime artwork source matches the local source. The GC diagnostic used the final upstream-pin binary.
 
-The warmed run also measured zero CPU ticks for each of the three paused engines over 30 s, resumed them, stopped every test process and resumed both owners. Final socket queries report sysc-logo/material playing on DP-1 and DP-3. Saved assignments, shell config hash and deployment stamp match the captured snapshots.
+The warmed run also measured zero CPU ticks for each of the three paused engines over 30 s, resumed them, stopped every test process and resumed both owners. Final socket queries report sysc-logo/material playing on DP-1 and DP-3. Saved assignments and the shell config hash match the captured snapshots. Another session deployed shell revision `520a855591c9aa6f71f1fd9cbff452d839b099f5` at 11:25:58 UTC during the soak; this commission did not deploy or roll it back. The restored owner sockets still report the captured effect and theme.
 
-**Release gate:** The cold-start growth failure remains open. The owner has been asked whether the 10 MiB growth cap includes startup or begins after warmup. Engine merge and installation wait for that interpretation. The installed engine and shell remain unchanged.
+**Release gate:** The cold-start growth failure remains open. The owner has been asked whether the 10 MiB growth cap includes startup or begins after warmup. Engine merge and installation wait for that interpretation. This commission has not installed the engine or deployed the shell.
 
 ## Qualification limits
 
