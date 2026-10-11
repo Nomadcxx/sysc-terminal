@@ -139,3 +139,9 @@ func TestFrameIntervalStartsWhenTickSubmitted(t *testing.T) {
 		t.Fatal("queued another tick while one is pending")
 	}
 }
+
+func TestBlurUsesApprovedFrameCadence(t *testing.T) {
+	if FrameInterval(0) != 50*time.Millisecond || FrameInterval(64) != 120*time.Millisecond {
+		t.Fatal("blur lost the approved CPU margin")
+	}
+}

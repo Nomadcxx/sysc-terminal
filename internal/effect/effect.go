@@ -170,6 +170,7 @@ func List() string {
 		seen[meta.Name] = true
 		fmt.Fprintf(&b, "theme  %s %s\n", meta.Name, strings.Join(meta.Aliases, ","))
 	}
+	fmt.Fprintln(&b, "capability blur 64")
 	fmt.Fprintf(&b, "version %s\n", animations.GetLibraryVersion())
 	return b.String()
 }

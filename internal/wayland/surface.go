@@ -73,3 +73,12 @@ func ShouldRetryPaint(released, pending, ready bool) bool {
 func ShouldAdvance(last, now time.Time) bool {
 	return now.Sub(last) >= TargetFrameInterval
 }
+
+// FrameInterval uses the approved 8.3 FPS fallback when post-processing blur is
+// enabled. The normal renderer keeps its measured 20 FPS ceiling.
+func FrameInterval(blur int) time.Duration {
+	if blur > 0 {
+		return 120 * time.Millisecond
+	}
+	return TargetFrameInterval
+}

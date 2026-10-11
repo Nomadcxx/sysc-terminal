@@ -90,6 +90,9 @@ an effect from Terminal Art in Settings.
 sysc-terminal --output eDP-1 --effect fire --theme nord --ipc-socket "$XDG_RUNTIME_DIR/sysc-terminal.sock"
 ```
 
+Add `--blur 16` to soften the wallpaper; the range is 0..64 output pixels, with 0 off.
+In sysc-shell, Settings → Terminal Art stores the blur strength for your next effect selection.
+
 Get the connector from `niri msg outputs`. Run one process per output with a distinct socket.
 
 Socket verbs: `query`, `pause`, `resume`, `change effect <id> theme <theme> [file <path>]`,
@@ -101,7 +104,7 @@ Socket verbs: `query`, `pause`, `resume`, `change effect <id> theme <theme> [fil
 - Bounded ANSI cell grid with a subset of SGR colour, wide-rune handling, and caps on frame bytes
   and cells
 - Font rasterisation with a glyph cache, into double-buffered `wl_shm` ARGB8888 buffers
-- 20 FPS ceiling; the warmed `fire`/`nord` frame check at 3440×1440 targets less than 25% of one
+- 20 FPS ceiling with blur off, 8.3 FPS with blur enabled; the warmed `fire`/`nord` frame check at 3440×1440 targets less than 25% of one
   CPU core (mean and p95). CPU use varies with effect, font, output and hardware.
 - One process per output, each with its own socket
 - `--list` reports the effect IDs, themes and text effects from the live sysc-Go registry
@@ -109,7 +112,7 @@ Socket verbs: `query`, `pause`, `resume`, `change effect <id> theme <theme> [fil
 
 ## Build
 
-Pins Go 1.26, sysc-Go `v1.0.4-0.20261004042739-c80d48f1f38e` and sysc-wayland `v0.3.1`. Niri
+Pins Go 1.26, sysc-Go `v1.0.6-0.20261008172414-1ff1f6c3c8d0` and sysc-wayland `v0.3.1`. Niri
 first, no CGO.
 
 ```bash

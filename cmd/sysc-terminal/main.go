@@ -13,6 +13,7 @@ import (
 
 	"github.com/Nomadcxx/sysc-terminal/internal/effect"
 	"github.com/Nomadcxx/sysc-terminal/internal/ipc"
+	"github.com/Nomadcxx/sysc-terminal/internal/raster"
 	"github.com/Nomadcxx/sysc-terminal/internal/wayland"
 )
 
@@ -44,11 +45,15 @@ func parseArgs(args []string) (commandLine, error) {
 	fs.StringVar(&parsed.owner.Theme, "theme", "nord", "sysc-Go theme name")
 	fs.StringVar(&parsed.owner.Artwork, "file", "", "artwork file for text effects")
 	fs.StringVar(&parsed.owner.Font, "font", "", "monospace font path")
+	fs.IntVar(&parsed.owner.BlurRadius, "blur", 0, "wallpaper blur strength 0..64 (0 off)")
 	fs.BoolVar(&parsed.list, "list", false, "list effects and themes")
 	fs.BoolVar(&parsed.help, "help", false, "show this help")
 	fs.BoolVar(&parsed.help, "h", false, "show this help")
 	if err := fs.Parse(args); err != nil {
 		return parsed, err
+	}
+	if parsed.owner.BlurRadius < 0 || parsed.owner.BlurRadius > raster.MaxBlurRadius {
+		return parsed, errors.New("--blur must be in 0..64")
 	}
 	if fs.NArg() != 0 {
 		return parsed, fmt.Errorf("unexpected arguments: %v", fs.Args())
@@ -165,6 +170,7 @@ Usage: sysc-terminal [flags]
       --theme name        sysc-Go theme (default nord)
       --file path         artwork for text effects
       --font path         monospace font path
-      --list              list effects and themes
+      --blur strength     wallpaper blur 0..64 output pixels (default 0, off)
+      --list              list effects, themes and capabilities
       --help              this help
 `

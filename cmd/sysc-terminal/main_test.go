@@ -34,3 +34,20 @@ func TestParseArgsRequiresSocketAndOutput(t *testing.T) {
 		t.Fatal("runtime started without output")
 	}
 }
+
+func TestWallpaperBlurFlag(t *testing.T) {
+	for _, value := range []string{"0", "16", "64"} {
+		got, err := parseArgs([]string{"--output", "DP-1", "-I", "/tmp/control.sock", "--blur", value})
+		if err != nil {
+			t.Fatalf("valid blur %s: %v", value, err)
+		}
+		if got.owner.BlurRadius < 0 || got.owner.BlurRadius > 64 {
+			t.Fatal("blur outside range")
+		}
+	}
+	for _, value := range []string{"-1", "65", "oops"} {
+		if _, err := parseArgs([]string{"--list", "--blur", value}); err == nil {
+			t.Fatalf("invalid blur %s accepted", value)
+		}
+	}
+}

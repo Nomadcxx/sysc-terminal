@@ -5,6 +5,7 @@ import (
 	"os"
 	"runtime"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -75,6 +76,33 @@ func TestWallpaperFrameBudget(t *testing.T) {
 		t.Fatalf("size: %v", err)
 	}
 	dst := make([]byte, total)
+	interval := wayland.TargetFrameInterval
+	var blur *raster.Blur
+	var canvas []byte
+	var canvasGrid *cell.Grid
+	if os.Getenv("SYSC_BLUR_BUDGET") != "" {
+		radius, err := strconv.Atoi(os.Getenv("SYSC_BLUR_BUDGET"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		interval = wayland.FrameInterval(radius)
+		blur, err = raster.NewBlur(modeW, modeH, radius)
+		if err != nil {
+			t.Fatal(err)
+		}
+		canvas = make([]byte, stride*modeH)
+	}
+	budget, cpuBudget := interval, interval/4
+	draw := func(g *cell.Grid, old *cell.Grid, pixels []byte) error {
+		if blur == nil {
+			return rz.DrawChanged(g, old, pixels, modeW, modeH, stride)
+		}
+		if err := rz.DrawChanged(g, canvasGrid, canvas, modeW, modeH, stride); err != nil {
+			return err
+		}
+		canvasGrid = g
+		return blur.Draw(pixels, canvas, stride)
+	}
 	slotBytes := stride * modeH
 	var previous [2]*cell.Grid
 	for i := 0; i < rows; i++ {
@@ -84,7 +112,7 @@ func TestWallpaperFrameBudget(t *testing.T) {
 		g := e.Grid()
 		slot := i % len(previous)
 		pixels := dst[slot*slotBytes : (slot+1)*slotBytes]
-		if err := rz.DrawChanged(g, previous[slot], pixels, modeW, modeH, stride); err != nil {
+		if err := draw(g, previous[slot], pixels); err != nil {
 			t.Fatalf("warmup draw %d: %v", i, err)
 		}
 		previous[slot] = g
@@ -113,7 +141,7 @@ func TestWallpaperFrameBudget(t *testing.T) {
 		}
 		slot := (rows + i) % len(previous)
 		pixels := dst[slot*slotBytes : (slot+1)*slotBytes]
-		if err := rz.DrawChanged(g, previous[slot], pixels, modeW, modeH, stride); err != nil {
+		if err := draw(g, previous[slot], pixels); err != nil {
 			t.Fatalf("draw: %v", err)
 		}
 		previous[slot] = g
@@ -151,8 +179,8 @@ func TestWallpaperFrameBudget(t *testing.T) {
 	cpuMin, cpuMax := cpuOrdered[0], cpuOrdered[len(cpuOrdered)-1]
 	line := fmt.Sprintf(
 		"budget font=%s grid=%dx%d cell=%dx%d n=%d target_fps=%.1f wall_min=%s wall_mean=%s wall_p95=%s wall_max=%s wall_cap=%s cpu_min=%s cpu_mean=%s cpu_p95=%s cpu_max=%s cpu_cap=%s cpu_share_p95=%.1f%% effect_cpu_p95=%s raster_cpu_p95=%s",
-		opened, cols, rows, cw, ch, len(samples), float64(time.Second)/float64(wayland.TargetFrameInterval), min, mean, p95, max, budget,
-		cpuMin, cpuMean, cpuP95, cpuMax, cpuBudget, float64(cpuP95)/float64(wayland.TargetFrameInterval)*100,
+		opened, cols, rows, cw, ch, len(samples), float64(time.Second)/float64(interval), min, mean, p95, max, budget,
+		cpuMin, cpuMean, cpuP95, cpuMax, cpuBudget, float64(cpuP95)/float64(interval)*100,
 		effectOrdered[(len(effectOrdered)*95+99)/100-1], rasterOrdered[(len(rasterOrdered)*95+99)/100-1],
 	)
 	fmt.Fprintln(os.Stderr, line)

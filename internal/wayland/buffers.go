@@ -16,20 +16,38 @@ const (
 )
 
 type bufferGeneration struct {
-	fd       int
-	data     []byte
-	pool     *client.ShmPool
-	buffers  [bufferSlots]*client.Buffer
-	busy     [bufferSlots]bool
-	lastGrid [bufferSlots]*cell.Grid
-	width    int
-	height   int
-	stride   int
-	retired  bool
-	owner    *Owner
+	fd         int
+	data       []byte
+	pool       *client.ShmPool
+	buffers    [bufferSlots]*client.Buffer
+	busy       [bufferSlots]bool
+	lastGrid   [bufferSlots]*cell.Grid
+	canvas     []byte
+	canvasGrid *cell.Grid
+	blur       *raster.Blur
+	width      int
+	height     int
+	stride     int
+	retired    bool
+	owner      *Owner
 }
 
 func newBufferGeneration(owner *Owner, shm *client.Shm, width, height int) (*bufferGeneration, error) {
+	var blur *raster.Blur
+	var canvas []byte
+	if owner.cfg.BlurRadius > 0 {
+		var err error
+		blur, err = raster.NewBlur(width, height, owner.cfg.BlurRadius)
+		if err != nil {
+			return nil, err
+		}
+		_, size, err := raster.BufferSize(width, height, 1)
+		if err != nil {
+			return nil, err
+		}
+		canvas = make([]byte, size)
+		width, height = blur.Size()
+	}
 	stride, total, err := raster.BufferSize(width, height, bufferSlots)
 	if err != nil {
 		return nil, err
@@ -38,7 +56,7 @@ func newBufferGeneration(owner *Owner, shm *client.Shm, width, height int) (*buf
 	if err != nil {
 		return nil, fmt.Errorf("wayland: memfd_create: %w", err)
 	}
-	g := &bufferGeneration{fd: fd, width: width, height: height, stride: stride, owner: owner}
+	g := &bufferGeneration{fd: fd, width: width, height: height, stride: stride, owner: owner, blur: blur, canvas: canvas}
 	if err := unix.Ftruncate(fd, int64(total)); err != nil {
 		g.destroy()
 		return nil, fmt.Errorf("wayland: ftruncate shm: %w", err)
@@ -87,7 +105,7 @@ func (g *bufferGeneration) freeSlot() int {
 
 func (g *bufferGeneration) inUse() bool { return g.busy[0] || g.busy[1] }
 
-func (g *bufferGeneration) resetHistory() { g.lastGrid = [bufferSlots]*cell.Grid{} }
+func (g *bufferGeneration) resetHistory() { g.lastGrid = [bufferSlots]*cell.Grid{}; g.canvasGrid = nil }
 
 func (g *bufferGeneration) destroy() error {
 	var errs []error
