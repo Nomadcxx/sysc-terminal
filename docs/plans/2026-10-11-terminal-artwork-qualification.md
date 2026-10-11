@@ -52,7 +52,7 @@ The measured average active CPU was about 4.4%, 9.4% and 12.2% of one core, resp
 
 The warmed run also measured zero CPU ticks for each of the three paused engines over 30 s, resumed them, stopped every test process and resumed both owners. Final socket queries report sysc-logo/material playing on DP-1 and DP-3. Saved assignments and the shell config hash match the captured snapshots. Another session deployed shell revision `520a855591c9aa6f71f1fd9cbff452d839b099f5` at 11:25:58 UTC during the soak; this commission did not deploy or roll it back. The restored owner sockets still report the captured effect and theme.
 
-**Release gate:** The cold-start growth failure remains open. The owner has been asked whether the 10 MiB growth cap includes startup or begins after warmup. Engine merge and installation wait for that interpretation. This commission has not installed the engine or deployed the shell.
+**Release approval:** On 2026-10-11 the owner reviewed these measurements and requested merge, rebuild from origin/main and deployment. Shipment proceeds with the recorded cold-start growth exception. The warmed absolute/growth gates pass; the original cold-start failure remains visible for future memory work.
 
 ## Qualification limits
 
