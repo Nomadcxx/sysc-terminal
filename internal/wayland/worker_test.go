@@ -12,6 +12,53 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func TestArtworkElapsedWorker(t *testing.T) {
+	e, err := effect.New("great-wave", "kanagawa", 80, 24, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := newEffectWorker(e, "great-wave", "kanagawa", func() {})
+	defer w.close()
+	_ = receiveFrame(t, w.frames)
+	if !w.submit(workerRequest{op: workerTick, elapsed: 120 * time.Millisecond}) {
+		t.Fatal("tick rejected")
+	}
+	_ = receiveAck(t, w.acks)
+	got := receiveFrame(t, w.frames)
+	want, _ := effect.New("great-wave", "kanagawa", 80, 24, "")
+	want.Tick()
+	want.TickElapsed(120 * time.Millisecond)
+	if !reflect.DeepEqual(got.grid, want.Grid()) {
+		t.Fatal("worker dropped elapsed time")
+	}
+}
+
+func TestArtworkElapsedOwnerPause(t *testing.T) {
+	w := &effectWorker{requests: make(chan workerRequest, 2), frames: make(chan workerResult, 1), acks: make(chan workerAck, 2), stop: make(chan struct{})}
+	baseline := time.Unix(1000, 0)
+	o := &Owner{worker: w, lastTick: baseline, pending: make(map[chan workerAck]chan ControlReply)}
+	for _, paused := range []bool{true, false} {
+		reply := make(chan workerAck, 1)
+		o.pending[reply] = nil
+		w.acks <- workerAck{op: workerPause, paused: paused, reply: reply}
+		if err := o.drainWorker(); err != nil {
+			t.Fatal(err)
+		}
+		if !o.lastTick.IsZero() {
+			t.Fatal("pause transition retained elapsed-time baseline")
+		}
+	}
+	o.onFrame(baseline.Add(time.Hour))
+	select {
+	case req := <-w.requests:
+		if req.elapsed != 50*time.Millisecond {
+			t.Fatalf("resumed tick includes paused time: %s", req.elapsed)
+		}
+	default:
+		t.Fatal("resume did not request a tick")
+	}
+}
+
 func TestArtworkWorkerRetainsCellAspect(t *testing.T) {
 	e, err := effect.New("great-wave", "kanagawa", 80, 24, "")
 	if err != nil {

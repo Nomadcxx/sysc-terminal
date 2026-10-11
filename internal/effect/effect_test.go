@@ -7,10 +7,51 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Nomadcxx/sysc-Go/animations"
 	"github.com/Nomadcxx/sysc-terminal/internal/cell"
 )
+
+func TestArtworkElapsed(t *testing.T) {
+	for _, id := range []string{"great-wave", "cyberpunk-girl", "wasteland"} {
+		fast, err := New(id, "kanagawa", 80, 24, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		slow, err := New(id, "kanagawa", 80, 24, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < 120; i++ {
+			if err = fast.TickElapsed(50 * time.Millisecond); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for i := 0; i < 50; i++ {
+			if err = slow.TickElapsed(120 * time.Millisecond); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if !reflect.DeepEqual(fast.Grid(), slow.Grid()) {
+			t.Fatalf("%s changes speed with blur", id)
+		}
+		before, count := fast.Grid(), fast.RenderCount()
+		fast.SetPaused(true)
+		if err = fast.TickElapsed(time.Hour); err != nil {
+			t.Fatal(err)
+		}
+		if fast.Grid() != before || fast.RenderCount() != count {
+			t.Fatal("paused effect performed work")
+		}
+		fast.SetPaused(false)
+		fast.TickElapsed(50 * time.Millisecond)
+		slow.TickElapsed(50 * time.Millisecond)
+		if !reflect.DeepEqual(fast.Grid(), slow.Grid()) {
+			t.Fatal("paused time leaked into motion")
+		}
+	}
+}
 
 func TestArtworkConstructTickResizePause(t *testing.T) {
 	for _, id := range []string{"great-wave", "cyberpunk-girl", "wasteland"} {
