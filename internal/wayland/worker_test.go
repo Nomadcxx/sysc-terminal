@@ -2,6 +2,7 @@ package wayland
 
 import (
 	"errors"
+	"reflect"
 	"runtime"
 	"sync"
 	"testing"
@@ -10,6 +11,42 @@ import (
 	"github.com/Nomadcxx/sysc-terminal/internal/effect"
 	"golang.org/x/sys/unix"
 )
+
+func TestArtworkWorkerRetainsCellAspect(t *testing.T) {
+	e, err := effect.New("great-wave", "kanagawa", 80, 24, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := newEffectWorker(e, "great-wave", "kanagawa", func() {})
+	defer w.close()
+	_ = receiveFrame(t, w.frames)
+	for _, req := range []workerRequest{
+		{op: workerResize, cols: 100, rows: 30, cellW: 7, cellH: 16},
+		{op: workerChange, id: "cyberpunk-girl", theme: "dracula"},
+		{op: workerReset},
+	} {
+		req.reply = make(chan workerAck, 1)
+		if !w.submit(req) {
+			t.Fatal("request rejected")
+		}
+		ack := receiveAck(t, w.acks)
+		if ack.err != nil {
+			t.Fatal(ack.err)
+		}
+		got := receiveFrame(t, w.frames)
+		want, err := effect.New(got.id, got.theme, 100, 30, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		want.SetCellAspect(7, 16)
+		if err = want.Tick(); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got.grid, want.Grid()) {
+			t.Fatalf("operation %d lost cell aspect", req.op)
+		}
+	}
+}
 
 func TestEffectWorkerTicksAndHonorsPause(t *testing.T) {
 	e, err := effect.New("fire", "nord", 80, 24, "")

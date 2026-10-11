@@ -67,10 +67,18 @@ func TestWallpaperFrameBudget(t *testing.T) {
 		t.Fatalf("D4 grid %dx%d below construction floor 21x24 (cell %dx%d)", cols, rows, cw, ch)
 	}
 
-	e, err := effect.New("fire", "nord", cols, rows, "")
+	id, theme := os.Getenv("SYSC_BUDGET_EFFECT"), os.Getenv("SYSC_BUDGET_THEME")
+	if id == "" {
+		id = "fire"
+	}
+	if theme == "" {
+		theme = "nord"
+	}
+	e, err := effect.New(id, theme, cols, rows, "")
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
+	e.SetCellAspect(cw, ch)
 	stride, total, err := raster.BufferSize(modeW, modeH, 2)
 	if err != nil {
 		t.Fatalf("size: %v", err)
@@ -118,11 +126,22 @@ func TestWallpaperFrameBudget(t *testing.T) {
 		previous[slot] = g
 	}
 
-	samples := make([]time.Duration, 0, budgetRuns)
-	cpuSamples := make([]time.Duration, 0, budgetRuns)
-	effectCPU := make([]time.Duration, 0, budgetRuns)
-	rasterCPU := make([]time.Duration, 0, budgetRuns)
-	for i := 0; i < budgetRuns; i++ {
+	// Sample a complete source loop so intermittent visor/cloud frames cannot
+	// hide behind the fire baseline's short steady-state window.
+	runs := budgetRuns
+	switch id {
+	case "great-wave":
+		runs = 120
+	case "cyberpunk-girl":
+		runs = 29
+	case "wasteland":
+		runs = 288
+	}
+	samples := make([]time.Duration, 0, runs)
+	cpuSamples := make([]time.Duration, 0, runs)
+	effectCPU := make([]time.Duration, 0, runs)
+	rasterCPU := make([]time.Duration, 0, runs)
+	for i := 0; i < runs; i++ {
 		cpuStart, err := threadCPU()
 		if err != nil {
 			t.Fatalf("read thread CPU: %v", err)
@@ -178,8 +197,8 @@ func TestWallpaperFrameBudget(t *testing.T) {
 	min, max := ordered[0], ordered[len(ordered)-1]
 	cpuMin, cpuMax := cpuOrdered[0], cpuOrdered[len(cpuOrdered)-1]
 	line := fmt.Sprintf(
-		"budget font=%s grid=%dx%d cell=%dx%d n=%d target_fps=%.1f wall_min=%s wall_mean=%s wall_p95=%s wall_max=%s wall_cap=%s cpu_min=%s cpu_mean=%s cpu_p95=%s cpu_max=%s cpu_cap=%s cpu_share_p95=%.1f%% effect_cpu_p95=%s raster_cpu_p95=%s",
-		opened, cols, rows, cw, ch, len(samples), float64(time.Second)/float64(interval), min, mean, p95, max, budget,
+		"budget effect=%s theme=%s font=%s grid=%dx%d cell=%dx%d n=%d target_fps=%.1f wall_min=%s wall_mean=%s wall_p95=%s wall_max=%s wall_cap=%s cpu_min=%s cpu_mean=%s cpu_p95=%s cpu_max=%s cpu_cap=%s cpu_share_p95=%.1f%% effect_cpu_p95=%s raster_cpu_p95=%s",
+		id, theme, opened, cols, rows, cw, ch, len(samples), float64(time.Second)/float64(interval), min, mean, p95, max, budget,
 		cpuMin, cpuMean, cpuP95, cpuMax, cpuBudget, float64(cpuP95)/float64(interval)*100,
 		effectOrdered[(len(effectOrdered)*95+99)/100-1], rasterOrdered[(len(rasterOrdered)*95+99)/100-1],
 	)

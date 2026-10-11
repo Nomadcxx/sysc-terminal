@@ -847,7 +847,7 @@ func (o *Owner) applyPendingLayout() error {
 	}
 	old := o.geometry
 	geometryChanged := !o.configured || geometry.PixelWidth != old.PixelWidth || geometry.PixelHeight != old.PixelHeight
-	gridChanged := !o.configured || geometry.Cols != old.Cols || geometry.Rows != old.Rows
+	gridChanged := !o.configured || geometry.Cols != old.Cols || geometry.Rows != old.Rows || geometry.CellWidth != old.CellWidth || geometry.CellHeight != old.CellHeight
 	if geometryChanged {
 		generation, err := newBufferGeneration(o, o.shm, geometry.PixelWidth, geometry.PixelHeight)
 		if err != nil {
@@ -873,7 +873,7 @@ func (o *Owner) applyPendingLayout() error {
 	}
 	if gridChanged {
 		ack := make(chan workerAck, 1)
-		if !o.worker.submit(workerRequest{op: workerResize, cols: geometry.Cols, rows: geometry.Rows, reply: ack}) {
+		if !o.worker.submit(workerRequest{op: workerResize, cols: geometry.Cols, rows: geometry.Rows, cellW: cellW, cellH: cellH, reply: ack}) {
 			return ErrOwnerBusy
 		}
 		o.pending[ack] = nil

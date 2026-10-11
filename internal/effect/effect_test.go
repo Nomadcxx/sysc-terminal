@@ -4,12 +4,108 @@ import (
 	"bufio"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/Nomadcxx/sysc-Go/animations"
 	"github.com/Nomadcxx/sysc-terminal/internal/cell"
 )
+
+func TestArtworkConstructTickResizePause(t *testing.T) {
+	for _, id := range []string{"great-wave", "cyberpunk-girl", "wasteland"} {
+		t.Run(id, func(t *testing.T) {
+			if !strings.Contains(List(), "effect "+id+" 0\n") {
+				t.Fatal("standalone catalog entry missing")
+			}
+			e, err := New(id, "kanagawa", 80, 24, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = e.Tick(); err != nil {
+				t.Fatal(err)
+			}
+			first := e.Grid()
+			ink := 0
+			for y := 0; y < 24; y++ {
+				for x := 0; x < 80; x++ {
+					if first.At(x, y).Ch != ' ' {
+						ink++
+					}
+				}
+			}
+			if ink < 200 {
+				t.Fatalf("only %d ink cells", ink)
+			}
+			for i := 0; i < 8; i++ {
+				if err = e.Tick(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if reflect.DeepEqual(e.Grid(), first) {
+				t.Fatal("animation does not move")
+			}
+			e.SetPaused(true)
+			gen, renders := e.Generation(), e.RenderCount()
+			frozen := e.Grid()
+			for i := 0; i < 5; i++ {
+				_ = e.Tick()
+			}
+			if e.Generation() != gen || e.RenderCount() != renders || e.Grid() != frozen {
+				t.Fatal("pause did effect work")
+			}
+			e.SetPaused(false)
+			e.SetCellAspect(7, 16)
+			if err = e.Resize(491, 90); err != nil {
+				t.Fatal(err)
+			}
+			if err = e.Tick(); err != nil {
+				t.Fatal(err)
+			}
+			if e.Grid().Cols != 491 || e.Grid().Rows != 90 {
+				t.Fatal("wrong resize geometry")
+			}
+			if err = e.Reset(); err != nil {
+				t.Fatal(err)
+			}
+			if err = e.Tick(); err != nil {
+				t.Fatal(err)
+			}
+			reset := e.Grid()
+			if err = e.Reset(); err != nil {
+				t.Fatal(err)
+			}
+			if err = e.Tick(); err != nil || !reflect.DeepEqual(reset, e.Grid()) {
+				t.Fatal("reset changed aspect or phase")
+			}
+		})
+	}
+}
+
+func TestArtworkBlankCellsKeepStyle(t *testing.T) {
+	e, err := New("cyberpunk-girl", "kanagawa", 491, 90, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = e.Tick(); err != nil {
+		t.Fatal(err)
+	}
+	fg := e.Grid().At(0, 0).Fg
+	for i := 0; i < 30; i++ {
+		if err = e.Tick(); err != nil {
+			t.Fatal(err)
+		}
+		g := e.Grid()
+		for y := 0; y < g.Rows; y++ {
+			for x := 0; x < g.Cols; x++ {
+				c := g.At(x, y)
+				if c.Ch == ' ' && c.Fg != fg {
+					t.Fatalf("tick %d blank (%d,%d) changed invisible foreground", i, x, y)
+				}
+			}
+		}
+	}
+}
 
 func TestFireConstructAndTick(t *testing.T) {
 	e, err := New("fire", "nord", 80, 24, "")
