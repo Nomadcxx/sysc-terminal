@@ -57,3 +57,13 @@ The warmed run also measured zero CPU ticks for each of the three paused engines
 ## Qualification limits
 
 The implementation bounds artwork output to 512×256 cells. Wider grids receive parser padding, so the scene centers within the capped artwork area. The actual 491×90 and 365×90 grids are unaffected. Laptop/4K hardware and fractional-scale observations require separate evidence. Wallpaper pixel blur does not establish compositor frosting; sysc-terminal-1 retains that investigation.
+
+## Deployment
+
+Engine PR #22 merged with local commit `32a6e204d0cd57531520f151e75d377828efd683`; author and committer are Nomadcxx <noovie@gmail.com>. Release `d4f7ba687210fdbe7fd872a884b2de129b87297e` reached origin/main. Named effect/worker checks and the build passed on the merge; main CI passed in run `38139374504`.
+
+Installed with `CGO_ENABLED=0 GOMAXPROCS=2 GOBIN=/home/nomadx/.local/bin go install github.com/Nomadcxx/sysc-terminal/cmd/sysc-terminal@main`. Go build metadata identifies engine `v0.1.1-0.20261011122800-d4f7ba687210`, library `v1.0.6-0.20261011112227-23c52e60dd7e`, and CGO disabled. Installed SHA-256: `2980f24784660e65cf1758e8db227b0ad0d4006a1e00bdb45bfa604fe5a281ae`.
+
+The live picker refreshed to 16 standalone effects, including all three scenes (`assets/2026-10-11-terminal-artwork/installed-picker.png` in the local shell plan directory). During deployment the owner selected Great Wave, cyberpunk girl and wasteland/material on both outputs. Owned process executable metadata confirms the new release. The owner's latest selection remains active. Shell already supports catalog refresh, so this commission required no shell source change or deployment.
+
+Tracking closes sysc-terminal-8 and shell sysc-1136/sysc-1137 after approval and deployment. Fractional-scale/resize blur observations and compositor frosting remain separate work.
