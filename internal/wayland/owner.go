@@ -34,11 +34,12 @@ var (
 )
 
 type Config struct {
-	Output  string
-	Effect  string
-	Theme   string
-	Artwork string
-	Font    string
+	Output     string
+	Effect     string
+	Theme      string
+	Artwork    string
+	Font       string
+	BlurRadius int
 }
 
 type ControlOp uint8
@@ -148,6 +149,9 @@ type Owner struct {
 }
 
 func NewOwner(cfg Config) (*Owner, error) {
+	if cfg.BlurRadius < 0 || cfg.BlurRadius > raster.MaxBlurRadius {
+		return nil, errors.New("wayland: blur must be in 0..64")
+	}
 	if cfg.Output == "" {
 		return nil, errors.New("wayland: output is required")
 	}
@@ -891,10 +895,22 @@ func (o *Owner) paintLatest() error {
 	if slot < 0 {
 		return nil
 	}
-	if err := o.rasterizer.DrawChanged(o.latest.grid, o.current.lastGrid[slot], o.current.pixels(slot), o.current.width, o.current.height, o.current.stride); err != nil {
-		return err
+	g := o.current
+	if g.blur != nil {
+		w, h := o.geometry.PixelWidth, o.geometry.PixelHeight
+		if err := o.rasterizer.DrawChanged(o.latest.grid, g.canvasGrid, g.canvas, w, h, w*4); err != nil {
+			return err
+		}
+		g.canvasGrid = o.latest.grid
+		if err := g.blur.Draw(g.pixels(slot), g.canvas, w*4); err != nil {
+			return err
+		}
+	} else {
+		if err := o.rasterizer.DrawChanged(o.latest.grid, g.lastGrid[slot], g.pixels(slot), g.width, g.height, g.stride); err != nil {
+			return err
+		}
+		g.lastGrid[slot] = o.latest.grid
 	}
-	o.current.lastGrid[slot] = o.latest.grid
 	if frameCallbackActionFor(o.paused, o.frameCallback != nil) == requestFrameCallback {
 		cb, err := o.surface.Frame()
 		if err != nil {
@@ -929,7 +945,7 @@ func (o *Owner) onFrame(now time.Time) {
 	if o.paused || o.stopping {
 		return
 	}
-	if !o.tickPending && ShouldAdvance(o.lastTick, now) {
+	if !o.tickPending && (o.lastTick.IsZero() || now.Sub(o.lastTick) >= FrameInterval(o.cfg.BlurRadius)) {
 		if o.worker.submit(workerRequest{op: workerTick}) {
 			o.tickPending = true
 			o.lastTick = now
