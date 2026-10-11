@@ -19,14 +19,15 @@ const (
 )
 
 type workerRequest struct {
-	op     workerOp
-	id     string
-	theme  string
-	file   string
-	cols   int
-	rows   int
-	paused bool
-	reply  chan workerAck
+	op           workerOp
+	id           string
+	theme        string
+	file         string
+	cols         int
+	rows         int
+	cellW, cellH int
+	paused       bool
+	reply        chan workerAck
 }
 
 type workerResult struct {
@@ -86,6 +87,7 @@ func (w *effectWorker) close() {
 func (w *effectWorker) run(current *effect.Effect, id, theme string) {
 	defer close(w.done)
 	paused := false
+	cellW, cellH := 1, 2
 	if err := current.Tick(); err != nil {
 		w.publishFrame(workerResult{err: err})
 		return
@@ -115,6 +117,7 @@ func (w *effectWorker) run(current *effect.Effect, id, theme string) {
 					next, err = effect.New(req.id, req.theme, current.EffectWidth(), current.EffectHeight(), "")
 				}
 				if err == nil {
+					next.SetCellAspect(cellW, cellH)
 					next.SetPaused(paused)
 					if !paused {
 						err = next.Tick()
@@ -131,6 +134,10 @@ func (w *effectWorker) run(current *effect.Effect, id, theme string) {
 					publish = true
 				}
 			case workerResize:
+				if req.cellW > 0 && req.cellH > 0 {
+					cellW, cellH = req.cellW, req.cellH
+				}
+				current.SetCellAspect(cellW, cellH)
 				err = current.Resize(req.cols, req.rows)
 				if err == nil && !paused {
 					err = current.Tick()

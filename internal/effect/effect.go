@@ -22,6 +22,7 @@ type ticker interface {
 type Effect struct {
 	id, theme, text string
 	w, h            int
+	cellW, cellH    int
 	paused          bool
 	gen, renders    int
 	grid            *cell.Grid
@@ -94,8 +95,19 @@ func (e *Effect) Reset() error {
 		return err
 	}
 	e.fx = fx
+	e.SetCellAspect(e.cellW, e.cellH)
 	e.grid = nil
 	return nil
+}
+
+func (e *Effect) SetCellAspect(width, height int) {
+	if width < 1 || height < 1 || width > 1024 || height > 1024 {
+		return
+	}
+	e.cellW, e.cellH = width, height
+	if scene, ok := e.fx.(*animations.ArtworkAnimation); ok {
+		scene.SetCellAspect(width, height)
+	}
 }
 
 type textSetter interface {
@@ -186,6 +198,12 @@ func requiresText(id string) bool {
 
 func construct(id, theme string, w, h int, text string) (ticker, error) {
 	switch id {
+	case "great-wave":
+		return animations.NewGreatWaveEffect(w, h, theme)
+	case "cyberpunk-girl":
+		return animations.NewCyberpunkGirlEffect(w, h, theme)
+	case "wasteland":
+		return animations.NewWastelandEffect(w, h, theme)
 	case "fire":
 		return animations.NewFireEffect(w, h, animations.GetFirePalette(theme)), nil
 	case "fire-text":
