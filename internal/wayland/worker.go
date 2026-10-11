@@ -3,6 +3,7 @@ package wayland
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/Nomadcxx/sysc-terminal/internal/cell"
 	"github.com/Nomadcxx/sysc-terminal/internal/effect"
@@ -27,6 +28,7 @@ type workerRequest struct {
 	rows         int
 	cellW, cellH int
 	paused       bool
+	elapsed      time.Duration
 	reply        chan workerAck
 }
 
@@ -103,7 +105,11 @@ func (w *effectWorker) run(current *effect.Effect, id, theme string) {
 			switch req.op {
 			case workerTick:
 				if !paused {
-					err = current.Tick()
+					elapsed := req.elapsed
+					if elapsed == 0 {
+						elapsed = 50 * time.Millisecond
+					}
+					err = current.TickElapsed(elapsed)
 					publish = true
 				}
 			case workerPause:
@@ -140,7 +146,7 @@ func (w *effectWorker) run(current *effect.Effect, id, theme string) {
 				current.SetCellAspect(cellW, cellH)
 				err = current.Resize(req.cols, req.rows)
 				if err == nil && !paused {
-					err = current.Tick()
+					err = current.TickElapsed(0)
 					publish = true
 				}
 			default:

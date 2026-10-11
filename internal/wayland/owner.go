@@ -733,6 +733,7 @@ func (o *Owner) handleControl(req ControlRequest) error {
 		}
 		if req.Op == ControlPause && req.Paused {
 			o.paused = true
+			o.lastTick = time.Time{}
 			if err := o.armFrameOnly(); err != nil {
 				return err
 			}
@@ -788,6 +789,7 @@ func (o *Owner) drainWorker() error {
 				switch ack.op {
 				case workerPause:
 					o.paused = ack.paused
+					o.lastTick = time.Time{}
 					if err := o.armFrameOnly(); err != nil {
 						return err
 					}
@@ -946,7 +948,11 @@ func (o *Owner) onFrame(now time.Time) {
 		return
 	}
 	if !o.tickPending && (o.lastTick.IsZero() || now.Sub(o.lastTick) >= FrameInterval(o.cfg.BlurRadius)) {
-		if o.worker.submit(workerRequest{op: workerTick}) {
+		elapsed := 50 * time.Millisecond
+		if !o.lastTick.IsZero() {
+			elapsed = now.Sub(o.lastTick)
+		}
+		if o.worker.submit(workerRequest{op: workerTick, elapsed: elapsed}) {
 			o.tickPending = true
 			o.lastTick = now
 			return

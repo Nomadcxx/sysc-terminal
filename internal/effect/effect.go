@@ -3,6 +3,7 @@ package effect
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Nomadcxx/sysc-Go/animations"
 	"github.com/Nomadcxx/sysc-terminal/internal/asset"
@@ -64,10 +65,23 @@ func NewFromFile(id, theme string, cols, rows int, path string) (*Effect, error)
 }
 
 func (e *Effect) Tick() error {
+	return e.TickElapsed(50 * time.Millisecond)
+}
+
+func (e *Effect) TickElapsed(elapsed time.Duration) error {
 	if e == nil || e.paused || e.fx == nil {
 		return nil
 	}
-	e.fx.Update()
+	if elapsed < 0 {
+		return nil
+	}
+	if elapsed > 0 {
+		if timed, ok := e.fx.(interface{ UpdateElapsed(time.Duration) }); ok {
+			timed.UpdateElapsed(elapsed)
+		} else {
+			e.fx.Update()
+		}
+	}
 	frame := e.fx.Render()
 	e.renders++
 	g, err := cell.Parse(frame, e.w, e.h)

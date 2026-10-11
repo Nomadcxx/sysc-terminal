@@ -114,7 +114,7 @@ func TestWallpaperFrameBudget(t *testing.T) {
 	slotBytes := stride * modeH
 	var previous [2]*cell.Grid
 	for i := 0; i < rows; i++ {
-		if err := e.Tick(); err != nil {
+		if err := e.TickElapsed(interval); err != nil {
 			t.Fatalf("warmup tick %d: %v", i, err)
 		}
 		g := e.Grid()
@@ -126,16 +126,16 @@ func TestWallpaperFrameBudget(t *testing.T) {
 		previous[slot] = g
 	}
 
-	// Sample a complete source loop so intermittent visor/cloud frames cannot
+	// Sample a complete scene loop so intermittent visor/cloud frames cannot
 	// hide behind the fire baseline's short steady-state window.
 	runs := budgetRuns
 	switch id {
 	case "great-wave":
-		runs = 120
+		runs = int((8*time.Second + interval - 1) / interval)
 	case "cyberpunk-girl":
-		runs = 29
+		runs = int((12*time.Second + interval - 1) / interval)
 	case "wasteland":
-		runs = 288
+		runs = int((16*time.Second + interval - 1) / interval)
 	}
 	samples := make([]time.Duration, 0, runs)
 	cpuSamples := make([]time.Duration, 0, runs)
@@ -147,7 +147,7 @@ func TestWallpaperFrameBudget(t *testing.T) {
 			t.Fatalf("read thread CPU: %v", err)
 		}
 		start := time.Now()
-		if err := e.Tick(); err != nil {
+		if err := e.TickElapsed(interval); err != nil {
 			t.Fatalf("tick: %v", err)
 		}
 		cpuAfterEffect, err := threadCPU()
