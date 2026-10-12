@@ -176,6 +176,11 @@ each connection, socket and version pin.
 MIT. Effects come from [sysc-Go](https://github.com/Nomadcxx/sysc-Go) (MIT); transport from
 [sysc-wayland](https://github.com/Nomadcxx/sysc-wayland) (BSD-3-Clause).
 
+The AK-47 effect includes model data from ["AK-47" by Lokeig](https://skfb.ly/oyAsI),
+licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
+That asset retains its noncommercial restriction. The adaptation samples the
+mesh into braille surface points and adds rotation and a particle morph.
+
 ---
 
 <a href="https://github.com/Nomadcxx"><img src="https://raw.githubusercontent.com/Nomadcxx/Nomadcxx/main/assets/rama-mark.svg" height="22" alt="RAMA"></a> — terminal-native tooling for the linux desktop.

@@ -119,7 +119,7 @@ func (e *Effect) SetCellAspect(width, height int) {
 		return
 	}
 	e.cellW, e.cellH = width, height
-	if scene, ok := e.fx.(*animations.ArtworkAnimation); ok {
+	if scene, ok := e.fx.(interface{ SetCellAspect(int, int) }); ok {
 		scene.SetCellAspect(width, height)
 	}
 }
@@ -212,6 +212,8 @@ func requiresText(id string) bool {
 
 func construct(id, theme string, w, h int, text string) (ticker, error) {
 	switch id {
+	case "ak-47":
+		return animations.NewAK47Effect(w, h, theme), nil
 	case "great-wave":
 		return animations.NewGreatWaveEffect(w, h, theme)
 	case "cyberpunk-girl":

@@ -335,3 +335,57 @@ func TestLogoSpinConstructAndTick(t *testing.T) {
 		}
 	}
 }
+
+func TestAK47Lifecycle(t *testing.T) {
+	if !strings.Contains(List(), "effect ak-47 0\n") {
+		t.Fatal("missing standalone AK-47")
+	}
+	a, err := New("ak-47", "kanagawa", 80, 24, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.SetCellAspect(7, 16)
+	if err = a.TickElapsed(0); err != nil {
+		t.Fatal(err)
+	}
+	first := a.Grid()
+	if err = a.TickElapsed(9 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if reflect.DeepEqual(first, a.Grid()) {
+		t.Fatal("did not morph")
+	}
+	a.SetPaused(true)
+	frozen, count := a.Grid(), a.RenderCount()
+	if err = a.TickElapsed(time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if a.Grid() != frozen || a.RenderCount() != count {
+		t.Fatal("pause performed work")
+	}
+	a.SetPaused(false)
+	if err = a.TickElapsed(3 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(first, a.Grid()) {
+		t.Fatal("cycle did not reconstruct")
+	}
+	if err = a.Resize(365, 90); err != nil {
+		t.Fatal(err)
+	}
+	if err = a.Tick(); err != nil {
+		t.Fatal(err)
+	}
+	if err = a.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	if err = a.Resize(80, 24); err != nil {
+		t.Fatal(err)
+	}
+	if err = a.TickElapsed(0); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(first, a.Grid()) {
+		t.Fatal("reset changed geometry or cell aspect")
+	}
+}

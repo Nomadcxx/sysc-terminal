@@ -132,7 +132,7 @@ func TestWallpaperFrameBudget(t *testing.T) {
 	switch id {
 	case "great-wave":
 		runs = int((8*time.Second + interval - 1) / interval)
-	case "cyberpunk-girl":
+	case "cyberpunk-girl", "ak-47":
 		runs = int((12*time.Second + interval - 1) / interval)
 	case "wasteland":
 		runs = int((16*time.Second + interval - 1) / interval)
