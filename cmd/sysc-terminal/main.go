@@ -132,12 +132,12 @@ func (s *runtimeState) request(req wayland.ControlRequest) (wayland.ControlReply
 	}
 }
 
-func (s *runtimeState) Status() (bool, string, string) {
+func (s *runtimeState) Status() (bool, string, string, error) {
 	reply, err := s.request(wayland.ControlRequest{Op: wayland.ControlStatus})
 	if err != nil {
-		return false, "", ""
+		return false, "", "", err
 	}
-	return reply.Playing, reply.ID, reply.Theme
+	return reply.Playing, reply.ID, reply.Theme, nil
 }
 
 func (s *runtimeState) SetPaused(paused bool) error {
