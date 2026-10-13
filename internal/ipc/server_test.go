@@ -20,16 +20,20 @@ type fakeState struct {
 	id, theme, file                        string
 	paused, reset, stop                    bool
 	pauseErr, resetErr, stopErr, changeErr error
+	statusErr                              error
 	statusEntered                          chan struct{}
 	statusRelease                          <-chan struct{}
 }
 
-func (f *fakeState) Status() (playing bool, id, theme string) {
+func (f *fakeState) Status() (playing bool, id, theme string, err error) {
+	if f.statusErr != nil {
+		return false, "", "", f.statusErr
+	}
 	if f.statusEntered != nil {
 		f.statusEntered <- struct{}{}
 		<-f.statusRelease
 	}
-	return f.playing && !f.paused, f.id, f.theme
+	return f.playing && !f.paused, f.id, f.theme, nil
 }
 func (f *fakeState) SetPaused(p bool) error {
 	if f.pauseErr != nil {
@@ -120,6 +124,19 @@ func TestQueryBeforeReadyFails(t *testing.T) {
 	}
 	if !strings.HasPrefix(got, "STATUS:") {
 		t.Fatalf("query after ready: %q", got)
+	}
+}
+
+func TestQueryStatusErrorIsReturned(t *testing.T) {
+	st := &fakeState{statusErr: errNop}
+	s, path := start(t, st)
+	s.SetReady(true)
+	got, err := roundtrip(t, path, "query")
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	if got != "ERR nope" {
+		t.Fatalf("query with a status error = %q, want an ERR reply", got)
 	}
 }
 

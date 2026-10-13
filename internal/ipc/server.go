@@ -22,7 +22,7 @@ const maxLine = 4096
 const maxHandlers = 16
 
 type State interface {
-	Status() (playing bool, id, theme string)
+	Status() (playing bool, id, theme string, err error)
 	SetPaused(bool) error
 	Change(id, theme, file string) error
 	Reset() error
@@ -220,7 +220,10 @@ func (s *Server) dispatch(line string) string {
 		if !ready {
 			return "ERR not ready"
 		}
-		playing, id, theme := s.st.Status()
+		playing, id, theme, err := s.st.Status()
+		if err != nil {
+			return errorReply(err)
+		}
 		state := "paused"
 		if playing {
 			state = "playing"
