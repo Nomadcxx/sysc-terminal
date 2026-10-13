@@ -438,3 +438,62 @@ func TestBlockElementsTileWithoutSeams(t *testing.T) {
 		}
 	}
 }
+
+func TestSmallFooterFixedAtRight(t *testing.T) {
+	rz := openTestFont(t)
+	cw, ch := rz.CellSize()
+	const credit = "AK-47 / Lokeig / CC BY-NC 4.0"
+	makeGrid := func(top string, small bool) *cell.Grid {
+		g, err := cell.Parse(top+strings.Repeat("\n", 23)+strings.Repeat(" ", 80-len(credit))+credit, 80, 24)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g.SmallFooter = small
+		return g
+	}
+	w, h := 80*cw+3, 24*ch+2
+	draw := func(g, old *cell.Grid, pixels []byte) {
+		t.Helper()
+		if err := rz.DrawChanged(g, old, pixels, w, h, w*4); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first := makeGrid("A", true)
+	a := make([]byte, w*h*4)
+	draw(first, nil, a)
+	next := makeGrid("DIFFERENT FRAME", true)
+	b := bytes.Clone(a)
+	draw(next, first, b)
+	row := (24 - 1) * ch * w * 4
+	if !bytes.Equal(a[row:], b[row:]) {
+		t.Fatal("credit moved or changed with animation")
+	}
+	bounds := func(p []byte) image.Rectangle {
+		box := image.Rectangle{}
+		for y := 23 * ch; y < h; y++ {
+			for x := 0; x < w; x++ {
+				i := (y*w + x) * 4
+				if p[i]|p[i+1]|p[i+2] != 0 {
+					box = box.Union(image.Rect(x, y, x+1, y+1))
+				}
+			}
+		}
+		return box
+	}
+	small := bounds(b)
+	normalGrid := makeGrid("DIFFERENT FRAME", false)
+	normal := make([]byte, len(b))
+	draw(normalGrid, nil, normal)
+	large := bounds(normal)
+	if small.Empty() || small.Dx() >= large.Dx() || small.Dy() >= large.Dy() {
+		t.Fatalf("footer is not smaller: %v versus %v", small, large)
+	}
+	if w-small.Max.X > cw || h-small.Max.Y > ch {
+		t.Fatalf("footer is not at far bottom right: %v in %dx%d", small, w, h)
+	}
+	// Switching effects must erase the small footer, including pixel remainders.
+	draw(normalGrid, next, b)
+	if !bytes.Equal(b, normal) {
+		t.Fatal("switching footer style left stale pixels")
+	}
+}

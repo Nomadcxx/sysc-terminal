@@ -74,3 +74,17 @@ No installation, wallpaper assignment, compositor surface, remote branch or
 pull request changed during this work. Live Wayland qualification remains a
 release step. Publish the library first, then resolve the engine module pin to
 that revision and repeat the focused integration check without `go.work`.
+
+## Settings integration
+
+Inspected sysc-shell's locally available `origin/main` at `564a7ad8` on
+2026-10-13. Its settings and Terminal Art panels refresh the installed engine's
+catalog on opening (`internal/shell/panelhost.go`). The effect cards use that
+catalog directly (`internal/shell/popout_terminalart.go`).
+
+The candidate's `--list` reports `effect ak-47 0`, which the shell's
+`wallpaper.ParseList` accepts as an effect requiring no external artwork.
+This shell revision needs no additional registry entry. After installing the
+published engine, reopening Settings or Terminal Art should expose `ak-47`.
+This is a source trace and candidate catalog check; installed integration has
+not been exercised.

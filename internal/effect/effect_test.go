@@ -389,3 +389,42 @@ func TestAK47Lifecycle(t *testing.T) {
 		t.Fatal("reset changed geometry or cell aspect")
 	}
 }
+
+func TestAK47FixedCredit(t *testing.T) {
+	a, err := New("ak-47", "kanagawa", 80, 24, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var footer string
+	for _, elapsed := range []time.Duration{0, time.Second, 7 * time.Second, time.Second, time.Second, time.Second, time.Second} {
+		if err = a.TickElapsed(elapsed); err != nil {
+			t.Fatal(err)
+		}
+		g := a.Grid()
+		if !g.SmallFooter {
+			t.Fatal("AK-47 credit not marked for small fixed rendering")
+		}
+		var line strings.Builder
+		for x := 0; x < g.Cols; x++ {
+			line.WriteRune(g.At(x, g.Rows-1).Ch)
+		}
+		if footer == "" {
+			footer = line.String()
+		} else if line.String() != footer {
+			t.Fatal("credit text/position changed during cycle")
+		}
+	}
+	if !strings.HasSuffix(footer, "AK-47 / Lokeig / CC BY-NC 4.0") {
+		t.Fatal("upstream credit lost")
+	}
+	other, err := New("sysc-logo", "kanagawa", 80, 24, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = other.Tick(); err != nil {
+		t.Fatal(err)
+	}
+	if other.Grid().SmallFooter {
+		t.Fatal("unrelated effect gained footer styling")
+	}
+}

@@ -54,6 +54,7 @@ type Rasterizer struct {
 
 	faceOf   map[rune]uint8 // resolved face per rune
 	affected map[rune]uint8 // runes that needed a fallback face
+	footer   *Rasterizer
 }
 
 // rasterFallbackMax bounds the face set (primary + fallbacks);
@@ -185,6 +186,7 @@ func (r *Rasterizer) SetPixelSize(pixelSize int) error {
 	r.blocks = nil
 	r.faceOf = make(map[rune]uint8)
 	r.affected = make(map[rune]uint8)
+	r.footer = nil
 	return nil
 }
 
@@ -209,11 +211,14 @@ func (r *Rasterizer) DrawChanged(g, previous *cell.Grid, dst []byte, width, heig
 	if width <= 0 || height <= 0 || stride <= 0 || width > int(^uint(0)>>1)/4 || stride < width*4 || height > int(^uint(0)>>1)/stride || len(dst) < stride*height {
 		return fmt.Errorf("raster: buffer %d stride %d for %dx%d", len(dst), stride, width, height)
 	}
-	full := previous == nil || previous.Cols != g.Cols || previous.Rows != g.Rows
+	full := previous == nil || previous.Cols != g.Cols || previous.Rows != g.Rows || previous.SmallFooter != g.SmallFooter
 	if full {
 		r.fillBlack(dst, stride, width, height)
 	}
 	for y := 0; y < g.Rows; y++ {
+		if g.SmallFooter && y == g.Rows-1 {
+			break
+		}
 		dy := y * r.cellH
 		if dy >= height {
 			break
@@ -245,6 +250,39 @@ func (r *Rasterizer) DrawChanged(g, previous *cell.Grid, dst []byte, width, heig
 			}
 			r.drawCell(g, x, y, c, dst, width, height, stride)
 		}
+	}
+	if g.SmallFooter {
+		return r.drawSmallFooter(g, dst, width, height, stride)
+	}
+	return nil
+}
+
+func (r *Rasterizer) drawSmallFooter(g *cell.Grid, dst []byte, width, height, stride int) error {
+	if r.footer == nil {
+		r.footer = &Rasterizer{font: r.font, fonts: r.fonts}
+		if err := r.footer.SetPixelSize(max(1, int(r.ppem)*3/4)); err != nil {
+			return err
+		}
+	}
+	f := r.footer
+	row := g.Rows - 1
+	start, end := 0, g.Cols
+	for start < end && g.At(start, row).Ch == ' ' {
+		start++
+	}
+	for end > start && g.At(end-1, row).Ch == ' ' {
+		end--
+	}
+	padding := max(1, (r.cellH-f.cellH)/2)
+	x, y := width-padding-(end-start)*f.cellW, height-padding-f.cellH
+	// The effect reserves its last row. Clear it on each buffer without touching
+	// the model, including any pixel remainder below the character grid.
+	top := max(0, min(row*r.cellH, y))
+	clearOpaqueBlack(dst, stride, 0, top, width, height-top, width, height)
+	// ponytail: source credits contain single-width characters. Wide-script
+	// credits would need the same two-cell layout handling as the main grid.
+	for col := start; col < end; col++ {
+		f.drawGlyphCell(g.At(col, row), false, x+(col-start)*f.cellW, y, dst, width, height, stride)
 	}
 	return nil
 }

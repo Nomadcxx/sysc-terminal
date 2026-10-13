@@ -88,6 +88,7 @@ func (e *Effect) TickElapsed(elapsed time.Duration) error {
 	if err != nil {
 		return err
 	}
+	g.SmallFooter = e.id == "ak-47"
 	e.grid = g
 	e.gen++
 	return nil

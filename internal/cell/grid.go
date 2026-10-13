@@ -20,7 +20,9 @@ type Cell struct {
 
 type Grid struct {
 	Cols, Rows int
-	cells      []Cell
+	// SmallFooter renders the last row as a fixed, smaller bottom-right credit.
+	SmallFooter bool
+	cells       []Cell
 }
 
 func (g *Grid) At(x, y int) Cell {
