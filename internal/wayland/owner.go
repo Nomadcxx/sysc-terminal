@@ -821,9 +821,6 @@ func (o *Owner) applyPendingLayout() error {
 	if !o.preferredScale || o.pendingLayout == nil {
 		return nil
 	}
-	if len(o.retired) != 0 {
-		return nil
-	}
 	layout := *o.pendingLayout
 	layout.scale120 = o.scale120
 	if layout.width <= 0 || layout.height <= 0 || layout.scale120 <= 0 {

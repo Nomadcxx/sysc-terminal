@@ -145,8 +145,12 @@ func (w *effectWorker) run(current *effect.Effect, id, theme string) {
 				}
 				current.SetCellAspect(cellW, cellH)
 				err = current.Resize(req.cols, req.rows)
-				if err == nil && !paused {
-					err = current.TickElapsed(0)
+				if err == nil {
+					if paused {
+						err = current.Redraw()
+					} else {
+						err = current.TickElapsed(0)
+					}
 					publish = true
 				}
 			default:

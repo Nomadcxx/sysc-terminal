@@ -82,9 +82,20 @@ func (e *Effect) TickElapsed(elapsed time.Duration) error {
 			e.fx.Update()
 		}
 	}
-	frame := e.fx.Render()
 	e.renders++
-	g, err := cell.Parse(frame, e.w, e.h)
+	return e.render()
+}
+
+// Redraw renders the current state at the current size without advancing it.
+func (e *Effect) Redraw() error {
+	if e == nil || e.fx == nil {
+		return nil
+	}
+	return e.render()
+}
+
+func (e *Effect) render() error {
+	g, err := cell.Parse(e.fx.Render(), e.w, e.h)
 	if err != nil {
 		return err
 	}
