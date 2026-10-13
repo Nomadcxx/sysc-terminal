@@ -14,7 +14,7 @@ import (
 )
 
 func TestArtworkElapsed(t *testing.T) {
-	for _, id := range []string{"great-wave", "cyberpunk-girl", "wasteland"} {
+	for _, id := range []string{"great-wave", "wasteland"} {
 		fast, err := New(id, "kanagawa", 80, 24, "")
 		if err != nil {
 			t.Fatal(err)
@@ -54,7 +54,7 @@ func TestArtworkElapsed(t *testing.T) {
 }
 
 func TestArtworkConstructTickResizePause(t *testing.T) {
-	for _, id := range []string{"great-wave", "cyberpunk-girl", "wasteland"} {
+	for _, id := range []string{"great-wave", "wasteland"} {
 		t.Run(id, func(t *testing.T) {
 			if !strings.Contains(List(), "effect "+id+" 0\n") {
 				t.Fatal("standalone catalog entry missing")
@@ -124,7 +124,7 @@ func TestArtworkConstructTickResizePause(t *testing.T) {
 }
 
 func TestArtworkBlankCellsKeepStyle(t *testing.T) {
-	e, err := New("cyberpunk-girl", "kanagawa", 491, 90, "")
+	e, err := New("great-wave", "kanagawa", 491, 90, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,7 +306,7 @@ func TestNewFromFileBoundsArtworkRead(t *testing.T) {
 }
 
 func TestLogoSpinConstructAndTick(t *testing.T) {
-	for _, id := range []string{"sysc-logo", "cross-logo", "justice-cross", "logo-morph"} {
+	for _, id := range []string{"sysc-logo", "cross-logo", "logo-morph"} {
 		e, err := New(id, "nord", 80, 24, "")
 		if err != nil {
 			t.Fatalf("%s: new: %v", id, err)
@@ -426,5 +426,54 @@ func TestAK47FixedCredit(t *testing.T) {
 	}
 	if other.Grid().SmallFooter {
 		t.Fatal("unrelated effect gained footer styling")
+	}
+}
+
+func TestAK47Artwork(t *testing.T) {
+	for _, id := range []string{"ak-47-rama", "ak-47-text"} {
+		e, err := New(id, "kanagawa", 80, 24, "XX  XX\n XXXX")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = e.TickElapsed(10 * time.Second); err != nil {
+			t.Fatal(err)
+		}
+		if !e.Grid().SmallFooter {
+			t.Fatalf("%s lost fixed credit", id)
+		}
+		held := e.Grid()
+		e.TickElapsed(time.Second)
+		if !reflect.DeepEqual(held, e.Grid()) {
+			t.Fatal("artwork hold moves")
+		}
+		e.SetPaused(true)
+		e.TickElapsed(time.Hour)
+		if !reflect.DeepEqual(held, e.Grid()) {
+			t.Fatal("pause changed frame")
+		}
+		if id == "ak-47-text" {
+			if err = e.SetText("\x1b[31mX"); err == nil {
+				t.Fatal("accepted controls")
+			}
+			if err = e.SetText("XXXXX\nX   X\nXXXXX"); err != nil {
+				t.Fatal(err)
+			}
+			e.SetPaused(false)
+			e.TickElapsed(10 * time.Second)
+			if reflect.DeepEqual(held, e.Grid()) {
+				t.Fatal("text replacement ignored")
+			}
+		}
+	}
+	if _, err := New("ak-47-text", "kanagawa", 80, 24, ""); err == nil {
+		t.Fatal("missing file accepted")
+	}
+	for _, id := range []string{"justice-cross", "cyberpunk-girl"} {
+		if strings.Contains(List(), "effect "+id+" ") {
+			t.Fatalf("unfinished %s listed", id)
+		}
+		if _, err := New(id, "kanagawa", 80, 24, ""); err == nil {
+			t.Fatalf("unfinished %s accepted", id)
+		}
 	}
 }

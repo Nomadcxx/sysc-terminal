@@ -69,7 +69,7 @@ func TestArtworkWorkerRetainsCellAspect(t *testing.T) {
 	_ = receiveFrame(t, w.frames)
 	for _, req := range []workerRequest{
 		{op: workerResize, cols: 100, rows: 30, cellW: 7, cellH: 16},
-		{op: workerChange, id: "cyberpunk-girl", theme: "dracula"},
+		{op: workerChange, id: "ak-47-rama", theme: "dracula"},
 		{op: workerReset},
 	} {
 		req.reply = make(chan workerAck, 1)

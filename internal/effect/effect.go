@@ -88,7 +88,7 @@ func (e *Effect) TickElapsed(elapsed time.Duration) error {
 	if err != nil {
 		return err
 	}
-	g.SmallFooter = e.id == "ak-47"
+	g.SmallFooter = e.id == "ak-47" || e.id == "ak-47-rama" || e.id == "ak-47-text"
 	e.grid = g
 	e.gen++
 	return nil
@@ -135,6 +135,15 @@ func (e *Effect) SetText(text string) error {
 	}
 	if requiresText(e.id) && text == "" {
 		return fmt.Errorf("effect %q requires artwork", e.id)
+	}
+	if e.id == "ak-47-text" {
+		fx, err := construct(e.id, e.theme, e.w, e.h, text)
+		if err != nil {
+			return err
+		}
+		e.fx, e.text, e.grid = fx, text, nil
+		e.SetCellAspect(e.cellW, e.cellH)
+		return nil
 	}
 	s, ok := e.fx.(textSetter)
 	if !ok {
@@ -213,12 +222,14 @@ func requiresText(id string) bool {
 
 func construct(id, theme string, w, h int, text string) (ticker, error) {
 	switch id {
+	case "ak-47-rama":
+		return animations.NewAK47RAMAEffect(w, h, theme)
+	case "ak-47-text":
+		return animations.NewAK47TextEffect(w, h, theme, text)
 	case "ak-47":
 		return animations.NewAK47Effect(w, h, theme), nil
 	case "great-wave":
 		return animations.NewGreatWaveEffect(w, h, theme)
-	case "cyberpunk-girl":
-		return animations.NewCyberpunkGirlEffect(w, h, theme)
 	case "wasteland":
 		return animations.NewWastelandEffect(w, h, theme)
 	case "fire":
@@ -274,8 +285,7 @@ func construct(id, theme string, w, h int, text string) (ticker, error) {
 		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "sysc", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
 	case "cross-logo":
 		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "cross", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
-	case "justice-cross":
-		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "justice", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
+
 	case "logo-morph":
 		return animations.NewLogoSpinEffect(animations.LogoSpinConfig{Width: w, Height: h, Shape: "sysc-cross", Palette: animations.GetLogoPalette(theme), Theme: theme}), nil
 	default:

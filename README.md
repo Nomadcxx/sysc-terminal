@@ -70,6 +70,15 @@ Keep `~/.local/bin` on the PATH of the shell service, then restart sysc-shell so
 catalog. In sysc-shell, open Terminal Art from the Control Centre or Settings, choose an effect and
 palette, and apply it to an output.
 
+### AK-47 variants
+
+`ak-47` rotates twice and swirls. `ak-47-rama` rotates twice, forms RAMA in
+braille particles, holds for two seconds and reforms the rifle. For custom
+artwork, use `--effect ak-47-text --file /path/to/art.txt`; it follows the same
+14-second loop. The file must contain literal UTF-8 artwork within 64 KiB.
+The RAMA preset appears in sysc-shell's Terminal Art picker. The custom variant
+uses the engine's existing file option.
+
 ### AUR
 
 On Arch, install [sysc-terminal](https://aur.archlinux.org/packages/sysc-terminal) with
