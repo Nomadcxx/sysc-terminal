@@ -6,28 +6,33 @@ import (
 )
 
 func TestHelpLocalePrecedence(t *testing.T) {
-	t.Setenv("LC_ALL", "ru_RU.UTF-8")
-	t.Setenv("LC_MESSAGES", "ja")
-	t.Setenv("LANG", "de")
-	if got := helpLocale(); got != "ru" {
-		t.Fatalf("helpLocale() = %q, want ru", got)
-	}
-	t.Setenv("LC_ALL", "")
-	if got := helpLocale(); got != "ja" {
-		t.Fatalf("helpLocale() = %q, want ja", got)
-	}
-	t.Setenv("LC_MESSAGES", "")
-	t.Setenv("LANG", "es_MX")
-	if got := helpLocale(); got != "es" {
-		t.Fatalf("helpLocale() = %q, want es", got)
-	}
-	t.Setenv("LANG", "C")
-	if got := helpLocale(); got != "" {
-		t.Fatalf("helpLocale() = %q, want empty", got)
+	for _, tc := range []struct {
+		name, all, messages, lang, want string
+	}{
+		{"supported LC_ALL wins", "ru_RU.UTF-8", "ja", "de", "ru"},
+		{"C LC_ALL stops lookup", "C", "pt", "ja", ""},
+		{"POSIX LC_ALL stops lookup", "POSIX.UTF-8", "pt", "ja", ""},
+		{"unsupported LC_ALL stops lookup", "de_DE.UTF-8", "pt", "ja", ""},
+		{"C LC_MESSAGES stops lookup", "", "C", "ja", ""},
+		{"POSIX LC_MESSAGES stops lookup", "", "POSIX", "ja", ""},
+		{"unsupported LC_MESSAGES stops lookup", "", "de_DE.UTF-8", "ja", ""},
+		{"empty LC_ALL falls through", "", "ja", "es", "ja"},
+		{"empty higher variables fall through", "", "", "es_MX", "es"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("LC_ALL", tc.all)
+			t.Setenv("LC_MESSAGES", tc.messages)
+			t.Setenv("LANG", tc.lang)
+			if got := helpLocale(); got != tc.want {
+				t.Fatalf("helpLocale() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
 func TestHelpUsageTranslated(t *testing.T) {
+	t.Setenv("LC_MESSAGES", "")
+	t.Setenv("LANG", "")
 	markers := map[string]string{
 		"es": "Uso:", "pt": "papel de parede", "ja": "使い方:", "ko": "사용법:", "ru": "Использование:",
 	}
@@ -45,7 +50,9 @@ func TestHelpUsageTranslated(t *testing.T) {
 		}
 	}
 	t.Setenv("LC_ALL", "C")
+	t.Setenv("LC_MESSAGES", "ja_JP.UTF-8")
+	t.Setenv("LANG", "ru_RU.UTF-8")
 	if got := help(usage); got != usage {
-		t.Fatal("C locale must stay English")
+		t.Fatal("LC_ALL=C must stay English despite lower priority locale values")
 	}
 }
