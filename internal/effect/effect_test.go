@@ -219,6 +219,37 @@ func TestPausedTickDoesNotRender(t *testing.T) {
 	}
 }
 
+func TestRedrawDoesNotAdvance(t *testing.T) {
+	e, err := New("fire", "nord", 80, 24, "")
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	if err := e.Tick(); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	if err := e.Resize(100, 30); err != nil {
+		t.Fatalf("resize: %v", err)
+	}
+	renders := e.RenderCount()
+	if err := e.Redraw(); err != nil {
+		t.Fatalf("redraw: %v", err)
+	}
+	g := e.Grid()
+	if g == nil || g.Cols != 100 || g.Rows != 30 {
+		t.Fatalf("redraw grid = %+v, want 100x30", g)
+	}
+	if got := e.RenderCount(); got != renders {
+		t.Fatalf("redraw changed the render count %d -> %d", renders, got)
+	}
+	first := e.Grid()
+	if err := e.Redraw(); err != nil {
+		t.Fatalf("second redraw: %v", err)
+	}
+	if e.Grid() == first {
+		t.Fatal("second redraw reused the first grid")
+	}
+}
+
 func TestTextEffectRequiresArtwork(t *testing.T) {
 	if _, err := New("fire-text", "nord", 80, 24, ""); err == nil {
 		t.Fatal("text effect started without required artwork")

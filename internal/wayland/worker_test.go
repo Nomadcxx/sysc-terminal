@@ -167,6 +167,49 @@ func TestEffectWorkerChangeAndResize(t *testing.T) {
 	}
 }
 
+func TestEffectWorkerResizeWhilePausedPublishesFrame(t *testing.T) {
+	e, err := effect.New("fire", "nord", 80, 24, "")
+	if err != nil {
+		t.Fatalf("new effect: %v", err)
+	}
+	w := newEffectWorker(e, "fire", "nord", func() {})
+	defer w.close()
+	_ = receiveFrame(t, w.frames)
+
+	pausedReply := make(chan workerAck, 1)
+	if !w.submit(workerRequest{op: workerPause, paused: true, reply: pausedReply}) {
+		t.Fatal("pause request was rejected")
+	}
+	if paused := receiveAck(t, w.acks); paused.err != nil {
+		t.Fatalf("pause result = %+v", paused)
+	}
+
+	resize := make(chan workerAck, 1)
+	if !w.submit(workerRequest{op: workerResize, cols: 100, rows: 30, reply: resize}) {
+		t.Fatal("resize request was rejected")
+	}
+	if ack := receiveAck(t, w.acks); ack.err != nil || !ack.paused {
+		t.Fatalf("paused resize result = %+v", ack)
+	}
+	frame := receiveFrame(t, w.frames)
+	if frame.grid == nil || frame.grid.Cols != 100 || frame.grid.Rows != 30 {
+		t.Fatalf("paused resized frame grid = %+v", frame.grid)
+	}
+
+	tickReply := make(chan workerAck, 1)
+	if !w.submit(workerRequest{op: workerTick, reply: tickReply}) {
+		t.Fatal("tick request was rejected")
+	}
+	if tick := receiveAck(t, w.acks); tick.err != nil {
+		t.Fatalf("paused tick result = %+v", tick)
+	}
+	select {
+	case frame := <-w.frames:
+		t.Fatalf("paused worker published a second frame: %+v", frame)
+	default:
+	}
+}
+
 func TestOwnerWakeDoesNotWriteToReusedDescriptorAfterFinish(t *testing.T) {
 	for round := 0; round < 10000; round++ {
 		wake := [2]int{}
