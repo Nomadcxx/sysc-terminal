@@ -245,6 +245,8 @@ Verbs:
 | Request | Ack |
 |---|---|
 | `query` | `STATUS: playing\|paused effect <id> theme <theme>` |
+| `fps` | `FPS <n>` |
+| `fps <n>` (1–20) | `OK` or `ERR fps must be 1..20` |
 | `pause` | `OK` (idempotent) |
 | `resume` | `OK` (idempotent) |
 | `reset` | `OK` |
@@ -257,6 +259,12 @@ pass same allowlist walls uses (`$HOME/.config`, `$HOME/.local/share`,
 `/usr/share`, `/usr/local/share`) plus `$HOME` only if we decide it — v1
 keeps walls allowlist, not whole home directory. Shell never sends shell
 command string.
+
+`query` keeps its exact six fields because deployed shells reject anything
+else, so the frame rate travels on its own `fps` verb rather than inside
+`query`. `--fps n` sets the same cap at start-up. `fps` before the first
+configure answers `ERR not ready`, like `query`, and an engine without the
+verb answers `ERR unknown`, which the shell reads as its capability probe.
 
 **Engine also answers stateless `--list` flag**, one exec, no socket, no
 running instance:
@@ -368,7 +376,8 @@ Absent binary: honest banner, existing wallpaper still usable.
 | Output disconnect | Stop process, keep assignment |
 | `OpPause` from shell | Same as IPC pause |
 | Session suspend | Shell sends pause before `loginctl suspend` if it already has hook; if not, process simply dies with session — do not invent logind listeners inside engine for v1 |
-| Lock / screensaver / DPMS | Not v1. `sysc-910` / `sysc-911` / Niri output power become extra `OpPause` sources later. No occlusion detector |
+| Lock / screensaver / DPMS | Shell-side. The shell sends `pause` and `fps <n>`, and the engine still owns no detector and no listener: covered, locked, screens off and on-battery are all composed in `sysc-shell`, which is also where "manual pause wins" is decided |
+| `fps <n>` while paused | Stored only. No tick, no redraw, and it never resumes |
 
 ### D11 — Pins
 

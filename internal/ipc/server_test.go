@@ -19,7 +19,9 @@ type fakeState struct {
 	playing                                bool
 	id, theme, file                        string
 	paused, reset, stop                    bool
+	fps                                    int
 	pauseErr, resetErr, stopErr, changeErr error
+	fpsErr                                 error
 	statusErr                              error
 	statusEntered                          chan struct{}
 	statusRelease                          <-chan struct{}
@@ -62,6 +64,19 @@ func (f *fakeState) Change(id, theme, file string) error {
 	}
 	f.id, f.theme, f.file = id, theme, file
 	return nil
+}
+
+// SetFPS mirrors the engine: 0 asks for the rate, a value in range sets it, and
+// anything else is refused without changing it.
+func (f *fakeState) SetFPS(fps int) (int, error) {
+	if f.fpsErr != nil {
+		return 0, f.fpsErr
+	}
+	if fps == 0 {
+		return f.fps, nil
+	}
+	f.fps = fps
+	return f.fps, nil
 }
 
 func start(t *testing.T, st State) (*Server, string) {
@@ -253,6 +268,94 @@ func TestChangeEffectAcceptsArtworkPathWithSpaces(t *testing.T) {
 	}
 	if st.file != path {
 		t.Fatalf("artwork path = %q, want %q", st.file, path)
+	}
+}
+
+func TestFPSVerbReportsAndSetsTheRate(t *testing.T) {
+	st := &fakeState{fps: 20}
+	s, path := start(t, st)
+	s.SetReady(true)
+	got, err := roundtrip(t, path, "fps")
+	if err != nil || got != "FPS 20" {
+		t.Fatalf("bare fps = %q %v, want FPS 20", got, err)
+	}
+	got, err = roundtrip(t, path, "fps 10")
+	if err != nil || got != "OK" {
+		t.Fatalf("fps 10 = %q %v, want OK", got, err)
+	}
+	got, err = roundtrip(t, path, "fps")
+	if err != nil || got != "FPS 10" {
+		t.Fatalf("fps after setting = %q %v, want FPS 10", got, err)
+	}
+	if st.fps != 10 {
+		t.Fatalf("engine rate = %d, want 10", st.fps)
+	}
+	// fps changes the rate and nothing else.
+	if st.paused || st.reset || st.stop || st.id != "" || st.theme != "" {
+		t.Fatalf("fps touched playback state: %+v", *st)
+	}
+}
+
+func TestFPSVerbRejectsOutOfRangeRates(t *testing.T) {
+	st := &fakeState{fps: 20}
+	s, path := start(t, st)
+	s.SetReady(true)
+	for _, command := range []string{"fps 0", "fps 21", "fps -3", "fps ten", "fps 10 extra"} {
+		got, err := roundtrip(t, path, command)
+		if err != nil {
+			t.Fatalf("%s: %v", command, err)
+		}
+		if got != errFPSRange {
+			t.Errorf("%s reply = %q, want %q", command, got, errFPSRange)
+		}
+		if st.fps != 20 {
+			t.Fatalf("%s changed the rate to %d", command, st.fps)
+		}
+	}
+}
+
+func TestFPSVerbBeforeReadyIsRefused(t *testing.T) {
+	st := &fakeState{fps: 20}
+	_, path := start(t, st)
+	for _, command := range []string{"fps", "fps 10"} {
+		got, err := roundtrip(t, path, command)
+		if err != nil {
+			t.Fatalf("%s: %v", command, err)
+		}
+		if got != "ERR not ready" {
+			t.Errorf("%s before ready = %q, want ERR not ready", command, got)
+		}
+	}
+	if st.fps != 20 {
+		t.Fatalf("fps before ready changed the rate to %d", st.fps)
+	}
+}
+
+func TestFPSVerbReturnsTheEngineError(t *testing.T) {
+	st := &fakeState{fps: 20, fpsErr: errNop}
+	s, path := start(t, st)
+	s.SetReady(true)
+	got, err := roundtrip(t, path, "fps 10")
+	if err != nil || got != "ERR nope" {
+		t.Fatalf("fps 10 with an engine error = %q %v, want ERR nope", got, err)
+	}
+}
+
+// The shell in the field requires query's exact six fields, so the fps rate
+// travels on its own verb and query stays byte-identical.
+func TestQueryReplyStaysSixFields(t *testing.T) {
+	st := &fakeState{playing: true, id: "fire", theme: "nord", fps: 10}
+	s, path := start(t, st)
+	s.SetReady(true)
+	got, err := roundtrip(t, path, "query")
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	if got != "STATUS: playing effect fire theme nord" {
+		t.Fatalf("query = %q, want the unchanged six-field status", got)
+	}
+	if fields := strings.Fields(got); len(fields) != 6 {
+		t.Fatalf("query has %d fields, want exactly 6", len(fields))
 	}
 }
 

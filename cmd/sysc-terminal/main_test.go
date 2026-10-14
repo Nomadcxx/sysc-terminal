@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Nomadcxx/sysc-terminal/internal/wayland"
+)
 
 func TestParseArgsLongIPCFlags(t *testing.T) {
 	got, err := parseArgs([]string{
@@ -48,6 +52,28 @@ func TestWallpaperBlurFlag(t *testing.T) {
 	for _, value := range []string{"-1", "65", "oops"} {
 		if _, err := parseArgs([]string{"--list", "--blur", value}); err == nil {
 			t.Fatalf("invalid blur %s accepted", value)
+		}
+	}
+}
+
+func TestFPSFlagSetsTheStartUpRate(t *testing.T) {
+	got, err := parseArgs([]string{"--output", "DP-1", "-I", "/tmp/control.sock", "--fps", "12"})
+	if err != nil {
+		t.Fatalf("parse args: %v", err)
+	}
+	if got.owner.FPS != 12 {
+		t.Fatalf("--fps 12 set the rate to %d", got.owner.FPS)
+	}
+	got, err = parseArgs([]string{"--output", "DP-1", "-I", "/tmp/control.sock"})
+	if err != nil {
+		t.Fatalf("parse args: %v", err)
+	}
+	if got.owner.FPS != wayland.MaxFPS {
+		t.Fatalf("default rate = %d, want %d", got.owner.FPS, wayland.MaxFPS)
+	}
+	for _, value := range []string{"0", "21", "-3", "oops"} {
+		if _, err := parseArgs([]string{"--output", "DP-1", "-I", "/tmp/control.sock", "--fps", value}); err == nil {
+			t.Fatalf("--fps %s accepted", value)
 		}
 	}
 }

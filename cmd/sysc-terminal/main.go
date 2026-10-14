@@ -27,6 +27,7 @@ func main() {
 type commandLine struct {
 	socket string
 	owner  wayland.Config
+	fps    int
 	list   bool
 	help   bool
 }
@@ -46,6 +47,7 @@ func parseArgs(args []string) (commandLine, error) {
 	fs.StringVar(&parsed.owner.Artwork, "file", "", "artwork file for text effects")
 	fs.StringVar(&parsed.owner.Font, "font", "", "monospace font path")
 	fs.IntVar(&parsed.owner.BlurRadius, "blur", 0, "wallpaper blur strength 0..64 (0 off)")
+	fs.IntVar(&parsed.fps, "fps", wayland.MaxFPS, "frame-rate cap 1..20")
 	fs.BoolVar(&parsed.list, "list", false, "list effects and themes")
 	fs.BoolVar(&parsed.help, "help", false, "show this help")
 	fs.BoolVar(&parsed.help, "h", false, "show this help")
@@ -55,6 +57,10 @@ func parseArgs(args []string) (commandLine, error) {
 	if parsed.owner.BlurRadius < 0 || parsed.owner.BlurRadius > raster.MaxBlurRadius {
 		return parsed, errors.New("--blur must be in 0..64")
 	}
+	if parsed.fps < wayland.MinFPS || parsed.fps > wayland.MaxFPS {
+		return parsed, fmt.Errorf("--fps must be %d..%d", wayland.MinFPS, wayland.MaxFPS)
+	}
+	parsed.owner.FPS = parsed.fps
 	if fs.NArg() != 0 {
 		return parsed, fmt.Errorf("unexpected arguments: %v", fs.Args())
 	}
@@ -160,6 +166,16 @@ func (s *runtimeState) Stop() error {
 	return err
 }
 
+// SetFPS caps the tick rate and returns the cap now in force. fps 0 asks for
+// the current cap, which is how the socket's bare `fps` verb is answered.
+func (s *runtimeState) SetFPS(fps int) (int, error) {
+	reply, err := s.request(wayland.ControlRequest{Op: wayland.ControlFPS, FPS: fps})
+	if err != nil {
+		return 0, err
+	}
+	return reply.FPS, nil
+}
+
 const usage = `sysc-terminal — Niri Background-layer terminal-effect wallpaper
 
 Usage: sysc-terminal [flags]
@@ -171,6 +187,7 @@ Usage: sysc-terminal [flags]
       --file path         artwork for text effects
       --font path         monospace font path
       --blur strength     wallpaper blur 0..64 output pixels (default 0, off)
+      --fps n             frame-rate cap 1..20 (default 20)
       --list              list effects, themes and capabilities
       --help              this help
 `
