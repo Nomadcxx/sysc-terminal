@@ -40,6 +40,9 @@ type Config struct {
 	Artwork    string
 	Font       string
 	BlurRadius int
+	// FPS caps the tick rate. Zero means MaxFPS. Out-of-range values are
+	// clamped, so a hand-edited config cannot exceed the CPU budget.
+	FPS int
 }
 
 type ControlOp uint8
@@ -50,6 +53,8 @@ const (
 	ControlChange
 	ControlReset
 	ControlStop
+	// ControlFPS is last so the existing op values never shift.
+	ControlFPS
 )
 
 type ControlRequest struct {
@@ -58,13 +63,16 @@ type ControlRequest struct {
 	Theme  string
 	File   string
 	Paused bool
-	Reply  chan ControlReply
+	// FPS is the requested rate for ControlFPS; zero asks for the current one.
+	FPS   int
+	Reply chan ControlReply
 }
 
 type ControlReply struct {
 	Playing bool
 	ID      string
 	Theme   string
+	FPS     int
 	Err     error
 }
 
@@ -140,6 +148,7 @@ type Owner struct {
 	effectID    string
 	theme       string
 	paused      bool
+	fps         int
 	lastTick    time.Time
 	tickPending bool
 	pending     map[chan workerAck]chan ControlReply
@@ -187,7 +196,7 @@ func NewOwner(cfg Config) (*Owner, error) {
 		cfg: cfg, rasterizer: rz, controls: make(chan ControlRequest, controlQueueSize),
 		done: make(chan struct{}), wakeRead: fds[0], wakeWrite: fds[1],
 		outputs: make(map[uint32]*outputBinding), scale120: 120,
-		effectID: cfg.Effect, theme: cfg.Theme,
+		effectID: cfg.Effect, theme: cfg.Theme, fps: frameRate(cfg.FPS),
 		pending:    make(map[chan workerAck]chan ControlReply),
 		fatalOnAck: make(map[chan workerAck]bool),
 	}
@@ -715,7 +724,20 @@ func (o *Owner) handleControl(req ControlRequest) error {
 	}
 	switch req.Op {
 	case ControlStatus:
-		o.reply(req.Reply, ControlReply{Playing: !o.paused, ID: o.effectID, Theme: o.theme})
+		o.reply(req.Reply, ControlReply{Playing: !o.paused, ID: o.effectID, Theme: o.theme, FPS: o.fps})
+	case ControlFPS:
+		// FPS 0 asks for the current rate. A new rate only changes the tick
+		// gate: no worker round-trip, no reset of the effect, and no resume.
+		if req.FPS == 0 {
+			o.reply(req.Reply, ControlReply{FPS: o.fps})
+			break
+		}
+		if req.FPS < MinFPS || req.FPS > MaxFPS {
+			o.reply(req.Reply, ControlReply{FPS: o.fps, Err: ErrFPSRange})
+			break
+		}
+		o.fps = req.FPS
+		o.reply(req.Reply, ControlReply{FPS: o.fps})
 	case ControlPause, ControlChange, ControlReset:
 		workerReply := make(chan workerAck, 1)
 		workerReq := workerRequest{reply: workerReply}
@@ -811,6 +833,18 @@ func (o *Owner) reply(ch chan ControlReply, reply ControlReply) {
 	case ch <- reply:
 	default:
 	}
+}
+
+// control runs one request and returns the reply instead of handing it to a
+// channel, so the ops that answer on the owner goroutine (status, fps) are
+// testable without a goroutine.
+func (o *Owner) control(req ControlRequest) ControlReply {
+	ch := make(chan ControlReply, 1)
+	req.Reply = ch
+	if err := o.handleControl(req); err != nil {
+		return ControlReply{Err: err}
+	}
+	return <-ch
 }
 
 func (o *Owner) applyPendingLayout() error {
@@ -944,7 +978,7 @@ func (o *Owner) onFrame(now time.Time) {
 	if o.paused || o.stopping {
 		return
 	}
-	if !o.tickPending && (o.lastTick.IsZero() || now.Sub(o.lastTick) >= FrameInterval(o.cfg.BlurRadius)) {
+	if !o.tickPending && ShouldAdvance(o.lastTick, now, TickInterval(o.fps, o.cfg.BlurRadius)) {
 		elapsed := 50 * time.Millisecond
 		if !o.lastTick.IsZero() {
 			elapsed = now.Sub(o.lastTick)

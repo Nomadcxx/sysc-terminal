@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -27,6 +28,9 @@ type State interface {
 	Change(id, theme, file string) error
 	Reset() error
 	Stop() error
+	// SetFPS sets the tick-rate cap and returns the cap now in force. fps 0
+	// asks for the current cap without changing it.
+	SetFPS(fps int) (int, error)
 }
 
 type Server struct {
@@ -258,10 +262,42 @@ func (s *Server) dispatch(line string) string {
 			return errorReply(err)
 		}
 		return "OK"
+	case "fps":
+		s.mu.Lock()
+		ready := s.ready
+		s.mu.Unlock()
+		if !ready {
+			return "ERR not ready"
+		}
+		if len(fields) == 1 {
+			fps, err := s.st.SetFPS(0)
+			if err != nil {
+				return errorReply(err)
+			}
+			return fmt.Sprintf("FPS %d", fps)
+		}
+		if len(fields) != 2 {
+			return errFPSRange
+		}
+		fps, err := strconv.Atoi(fields[1])
+		// ponytail: 0 is the query sentinel, so the socket rejects it as a set
+		// argument. The numbers mirror wayland.MaxFPS/MinFPS; the engine clamps
+		// to the same range, so a drift here fails the owner, not the budget.
+		if err != nil || fps < 1 || fps > 20 {
+			return errFPSRange
+		}
+		if _, err := s.st.SetFPS(fps); err != nil {
+			return errorReply(err)
+		}
+		return "OK"
 	default:
 		return "ERR unknown"
 	}
 }
+
+// errFPSRange answers every rejected rate the same way, so a shell can match on
+// one string. The valid range is the protocol's, not the engine's.
+const errFPSRange = "ERR fps must be 1..20"
 
 func errorReply(err error) string {
 	message := strings.NewReplacer("\r", " ", "\n", " ").Replace(err.Error())

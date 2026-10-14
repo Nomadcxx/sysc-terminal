@@ -102,9 +102,13 @@ sysc-terminal --output eDP-1 --effect fire --theme nord --ipc-socket "$XDG_RUNTI
 Add `--blur 16` to soften the wallpaper; the range is 0..64 output pixels, with 0 off.
 In sysc-shell, Settings → Terminal Art stores the blur strength for your next effect selection.
 
+Add `--fps 10` to cap the animation rate; the range is 1..20, defaulting to 20. The same cap can be
+changed on a running process with the `fps` verb, which the shell uses to save power while the
+wallpaper is covered, locked, on battery or off-screen.
+
 Get the connector from `niri msg outputs`. Run one process per output with a distinct socket.
 
-Socket verbs: `query`, `pause`, `resume`, `change effect <id> theme <theme> [file <path>]`,
+Socket verbs: `query`, `fps [n]`, `pause`, `resume`, `change effect <id> theme <theme> [file <path>]`,
 `reset`, `stop`. A paused process keeps its last frame.
 
 ## Rendering
@@ -113,7 +117,8 @@ Socket verbs: `query`, `pause`, `resume`, `change effect <id> theme <theme> [fil
 - Bounded ANSI cell grid with a subset of SGR colour, wide-rune handling, and caps on frame bytes
   and cells
 - Font rasterisation with a glyph cache, into double-buffered `wl_shm` ARGB8888 buffers
-- 20 FPS ceiling with blur off, 8.3 FPS with blur enabled; the warmed `fire`/`nord` frame check at 3440×1440 targets less than 25% of one
+- 20 FPS ceiling with blur off, 8.3 FPS with blur enabled, and `--fps` lowers either without raising
+  the budget; the warmed `fire`/`nord` frame check at 3440×1440 targets less than 25% of one
   CPU core (mean and p95). CPU use varies with effect, font, output and hardware.
 - One process per output, each with its own socket
 - `--list` reports the effect IDs, themes and text effects from the live sysc-Go registry
