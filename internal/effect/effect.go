@@ -31,7 +31,7 @@ type Effect struct {
 }
 
 func New(id, theme string, cols, rows int, text string) (*Effect, error) {
-	if animations.GetEffectMetadata(id) == nil {
+	if !effectAvailable(id) {
 		return nil, fmt.Errorf("unknown effect %q", id)
 	}
 	if animations.GetThemeMetadata(theme) == nil {
@@ -99,7 +99,7 @@ func (e *Effect) render() error {
 	if err != nil {
 		return err
 	}
-	g.SmallFooter = e.id == "ak-47" || e.id == "ak-47-rama" || e.id == "ak-47-text"
+	g.SmallFooter = e.id == "ak-47" || e.id == "ak-47-text"
 	e.grid = g
 	e.gen++
 	return nil
@@ -202,6 +202,9 @@ func List() string {
 		text[id] = true
 	}
 	for _, id := range animations.GetEffectNames() {
+		if !effectAvailable(id) {
+			continue
+		}
 		flag := 0
 		if text[id] {
 			flag = 1
@@ -222,6 +225,15 @@ func List() string {
 	return b.String()
 }
 
+func effectAvailable(id string) bool {
+	switch id {
+	case "ak-47-rama", "justice-cross":
+		return false
+	default:
+		return animations.GetEffectMetadata(id) != nil
+	}
+}
+
 func requiresText(id string) bool {
 	for _, name := range animations.GetTextBasedEffects() {
 		if name == id {
@@ -233,8 +245,6 @@ func requiresText(id string) bool {
 
 func construct(id, theme string, w, h int, text string) (ticker, error) {
 	switch id {
-	case "ak-47-rama":
-		return animations.NewAK47RAMAEffect(w, h, theme)
 	case "ak-47-text":
 		return animations.NewAK47TextEffect(w, h, theme, text)
 	case "ak-47":

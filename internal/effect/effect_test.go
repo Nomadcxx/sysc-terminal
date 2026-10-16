@@ -306,6 +306,12 @@ func TestListMatchesRegistry(t *testing.T) {
 		}
 	}
 	for _, id := range animations.GetEffectNames() {
+		if !effectAvailable(id) {
+			if listed[id] {
+				t.Fatalf("--list printed unavailable registry id %q", id)
+			}
+			continue
+		}
 		if !listed[id] {
 			t.Fatalf("--list missing registry id %q", id)
 		}
@@ -461,7 +467,7 @@ func TestAK47FixedCredit(t *testing.T) {
 }
 
 func TestAK47Artwork(t *testing.T) {
-	for _, id := range []string{"ak-47-rama", "ak-47-text"} {
+	for _, id := range []string{"ak-47-text"} {
 		e, err := New(id, "kanagawa", 80, 24, "XX  XX\n XXXX")
 		if err != nil {
 			t.Fatal(err)
