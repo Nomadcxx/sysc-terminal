@@ -14,6 +14,9 @@ func TestGreeterThemeCatalogAndEffects(t *testing.T) {
 				t.Errorf("theme missing from --list")
 			}
 			for _, id := range animations.GetEffectNames() {
+				if !effectAvailable(id) {
+					continue
+				}
 				t.Run(id, func(t *testing.T) {
 					e, err := New(id, theme, 80, 24, "SYSC")
 					if err != nil {
@@ -33,6 +36,9 @@ func TestGreeterThemeCatalogAndEffects(t *testing.T) {
 
 func TestRegistryTickOnce(t *testing.T) {
 	for _, id := range animations.GetEffectNames() {
+		if !effectAvailable(id) {
+			continue
+		}
 		t.Run(id, func(t *testing.T) {
 			e, err := New(id, "nord", 80, 24, "SYSC")
 			if err != nil {
@@ -46,5 +52,16 @@ func TestRegistryTickOnce(t *testing.T) {
 				t.Fatalf("generation %d", e.Generation())
 			}
 		})
+	}
+}
+
+func TestBrokenEffectsAreUnavailable(t *testing.T) {
+	for _, id := range []string{"ak-47-rama", "justice-cross"} {
+		if strings.Contains(List(), "effect "+id+" ") {
+			t.Errorf("unfinished effect %q appears in --list", id)
+		}
+		if _, err := New(id, "nord", 80, 24, "SYSC"); err == nil {
+			t.Errorf("unfinished effect %q can be constructed", id)
+		}
 	}
 }
