@@ -9,46 +9,17 @@
 Live sysc-Go terminal effects as a Wayland wallpaper. Runs on Niri's background layer,
 with one process per output.
 
-https://github.com/user-attachments/assets/8c4d2b78-3adb-4824-9a22-f3f14c2bffe1
+<p align="center">
+  <img src="assets/tour.webp" alt="Animated sysc-terminal tour showing AK-47, logo-morph, cross-logo, Matrix, the theme selectors, and the ThinkPad panel." loading="lazy">
+</p>
 
-<p align="center"><sub>sysc-terminal as the desktop wallpaper, in Tokyo Night. Settings → Terminal Art, pick the cross-logo effect, launch terminals from the launcher, then open a plugin and the system monitor. The bar is sysc-shell's, themed to match.</sub></p>
+<p align="center"><sub>1920×1080 at 20 fps, with the theme selectors and ThinkPad panel open between effects.</sub></p>
 
 ## Quick Links
 
 - [Documentation site](https://nomadcxx.github.io/sysc/docs/components/sysc-terminal/)
 - [Documentation](#documentation)
 - [The sysc ecosystem](https://github.com/Nomadcxx/sysc-shell/blob/main/docs/ecosystem.md)
-
-## More themes
-
-The shell takes the effect's theme, so the bar, window borders and terminals follow it.
-
-https://github.com/user-attachments/assets/f6de15a4-4a31-4af3-83de-4644d6009512
-
-<p align="center"><sub>The sysc-logo effect in Rama.</sub></p>
-
-https://github.com/user-attachments/assets/74784eba-cb6f-4b17-94ce-fc7cb8732c7a
-
-<p align="center"><sub>The logo-morph effect in Dracula.</sub></p>
-
-## Other effects
-
-Each effect running as the wallpaper under sysc-shell, in a different theme.
-
-<table>
-  <tr>
-    <td align="center" valign="top"><img src="assets/screens/term-fire-eldritch.webp" alt="Fire, Eldritch" width="396"><br><sub>Fire, Eldritch</sub></td>
-    <td align="center" valign="top"><img src="assets/screens/term-matrix-nord.webp" alt="Matrix, Nord" width="396"><br><sub>Matrix, Nord</sub></td>
-  </tr>
-  <tr>
-    <td align="center" valign="top"><img src="assets/screens/term-rain-tokyo-night.webp" alt="Rain, Tokyo Night" width="396"><br><sub>Rain, Tokyo Night</sub></td>
-    <td align="center" valign="top"><img src="assets/screens/term-beams-dracula.webp" alt="Beams, Dracula" width="396"><br><sub>Beams, Dracula</sub></td>
-  </tr>
-  <tr>
-    <td align="center" valign="top"><img src="assets/screens/term-aquarium-catppuccin.webp" alt="Aquarium, Catppuccin" width="396"><br><sub>Aquarium, Catppuccin</sub></td>
-    <td align="center" valign="top"><img src="assets/screens/term-fireworks-gruvbox.webp" alt="Fireworks, Gruvbox" width="396"><br><sub>Fireworks, Gruvbox</sub></td>
-  </tr>
-</table>
 
 ## Installation
 
@@ -181,6 +152,35 @@ each connection, socket and version pin.
 
 - [The sysc ecosystem](https://github.com/Nomadcxx/sysc-shell/blob/main/docs/ecosystem.md)
 - [docs/plans](docs/plans) — design and feasibility notes
+
+## Effect gallery
+
+<details>
+<summary>More themes and effect screenshots</summary>
+
+The shell takes the effect's theme, so the bar, window borders and terminals follow it.
+
+- [sysc-logo in Rama](https://github.com/user-attachments/assets/f6de15a4-4a31-4af3-83de-4644d6009512)
+- [logo-morph in Dracula](https://github.com/user-attachments/assets/74784eba-cb6f-4b17-94ce-fc7cb8732c7a)
+
+Each effect below runs as the wallpaper under sysc-shell, in a different theme.
+
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="assets/screens/term-fire-eldritch.webp" alt="Fire, Eldritch" width="396" loading="lazy"><br><sub>Fire, Eldritch</sub></td>
+    <td align="center" valign="top"><img src="assets/screens/term-matrix-nord.webp" alt="Matrix, Nord" width="396" loading="lazy"><br><sub>Matrix, Nord</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="assets/screens/term-rain-tokyo-night.webp" alt="Rain, Tokyo Night" width="396" loading="lazy"><br><sub>Rain, Tokyo Night</sub></td>
+    <td align="center" valign="top"><img src="assets/screens/term-beams-dracula.webp" alt="Beams, Dracula" width="396" loading="lazy"><br><sub>Beams, Dracula</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="assets/screens/term-aquarium-catppuccin.webp" alt="Aquarium, Catppuccin" width="396" loading="lazy"><br><sub>Aquarium, Catppuccin</sub></td>
+    <td align="center" valign="top"><img src="assets/screens/term-fireworks-gruvbox.webp" alt="Fireworks, Gruvbox" width="396" loading="lazy"><br><sub>Fireworks, Gruvbox</sub></td>
+  </tr>
+</table>
+
+</details>
 
 ## License
 
