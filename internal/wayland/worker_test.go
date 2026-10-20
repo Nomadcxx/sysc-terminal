@@ -1,6 +1,7 @@
 package wayland
 
 import (
+	"context"
 	"errors"
 	"net"
 	"path/filepath"
@@ -126,6 +127,79 @@ func TestWaitAndDispatchSubmitsAtTickDeadline(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDeferredTickRetriesAfterWorkerWake(t *testing.T) {
+	ctx, _ := newTestWaylandContext(t)
+	wake := [2]int{0, 0}
+	if err := unix.Pipe2(wake[:], unix.O_CLOEXEC|unix.O_NONBLOCK); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = unix.Close(wake[0])
+		_ = unix.Close(wake[1])
+	})
+	worker := &effectWorker{
+		requests: make(chan workerRequest, 1),
+		frames:   make(chan workerResult, 1),
+		acks:     make(chan workerAck, 1),
+		stop:     make(chan struct{}),
+	}
+	worker.requests <- workerRequest{op: workerReset}
+	o := &Owner{ctx: ctx, worker: worker, wakeRead: wake[0], wakeWrite: wake[1], ready: true, fps: 20}
+	o.onFrame(time.Now())
+	if !o.tickDeferred {
+		t.Fatal("full worker queue did not defer the due tick")
+	}
+
+	<-worker.requests // the worker consumed its previous request
+	worker.acks <- workerAck{op: workerReset}
+	if _, err := unix.Write(wake[1], []byte{1}); err != nil {
+		t.Fatal(err)
+	}
+
+	loopCtx, cancel := context.WithCancel(context.Background())
+	loopDone := make(chan error, 1)
+	go func() { loopDone <- o.loop(loopCtx, nil) }()
+	loopStopped := false
+	defer func() {
+		if !loopStopped {
+			cancel()
+			_, _ = unix.Write(wake[1], []byte{1})
+			select {
+			case err := <-loopDone:
+				if err != nil {
+					t.Errorf("owner loop: %v", err)
+				}
+			case <-time.After(time.Second):
+				t.Error("owner loop did not stop after cancellation")
+			}
+		}
+	}()
+	select {
+	case req := <-worker.requests:
+		if req.op != workerTick {
+			t.Fatalf("retried request op = %v, want workerTick", req.op)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("owner did not retry the deferred tick after the worker wake")
+	}
+	cancel()
+	if _, err := unix.Write(wake[1], []byte{1}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-loopDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+		loopStopped = true
+	case <-time.After(time.Second):
+		t.Fatal("owner loop did not stop after cancellation")
+	}
+	if !o.tickPending || o.tickDeferred {
+		t.Fatalf("tick pending=%t deferred=%t after retry, want pending only", o.tickPending, o.tickDeferred)
 	}
 }
 

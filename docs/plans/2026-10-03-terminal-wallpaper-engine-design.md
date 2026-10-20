@@ -418,7 +418,7 @@ Handwritten C/CGO requires new owner approval. Not part of this design.
      │  layer-shell Background, shm, frame cb, pause flag
      │         │
      │         ▼
-     │  frame callback, ≥120ms since last tick
+     │  tick deadline via poll timeout; pending frame callback gates tick
      │         │
      │         ▼
      │  sysc-Go effect.Update/Render  ──► bounded SGR ──► cell grid
