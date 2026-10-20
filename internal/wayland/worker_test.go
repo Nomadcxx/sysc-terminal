@@ -146,7 +146,8 @@ func TestDeferredTickRetriesAfterWorkerWake(t *testing.T) {
 		acks:     make(chan workerAck, 1),
 		stop:     make(chan struct{}),
 	}
-	worker.requests <- workerRequest{op: workerReset}
+	reply := make(chan workerAck, 1)
+	worker.requests <- workerRequest{op: workerReset, reply: reply}
 	o := &Owner{ctx: ctx, worker: worker, wakeRead: wake[0], wakeWrite: wake[1], ready: true, fps: 20}
 	o.onFrame(time.Now())
 	if !o.tickDeferred {
@@ -154,7 +155,7 @@ func TestDeferredTickRetriesAfterWorkerWake(t *testing.T) {
 	}
 
 	<-worker.requests // the worker consumed its previous request
-	worker.acks <- workerAck{op: workerReset}
+	worker.acks <- workerAck{op: workerReset, reply: reply}
 	if _, err := unix.Write(wake[1], []byte{1}); err != nil {
 		t.Fatal(err)
 	}
