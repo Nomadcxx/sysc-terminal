@@ -40,15 +40,16 @@ type Rasterizer struct {
 	fonts []*font.Font
 	faces []*font.Face // one per font at the current ppem
 
-	ppem  uint16
-	scale float32
-	cellW int
-	cellH int
-	base  int
-	cache map[rasterKey]*image.Alpha
-	order []rasterKey
-	black []byte
-	tiles map[cell.Cell][]byte
+	ppem      uint16
+	scale     float32
+	cellW     int
+	cellH     int
+	base      int
+	dimOutput bool
+	cache     map[rasterKey]*image.Alpha
+	order     []rasterKey
+	black     []byte
+	tiles     map[cell.Cell][]byte
 	// blocks holds the geometric block-element masks for the current size.
 	blocks map[rune]*image.Alpha
 
@@ -197,6 +198,17 @@ func (r *Rasterizer) CellSize() (w, h int) {
 	return r.cellW, r.cellH
 }
 
+// SetDimOutput applies the fixed one-third RGB transform while rasterizing.
+// Alpha is unchanged. It is set once when the renderer is constructed.
+func (r *Rasterizer) SetDimOutput(enabled bool) {
+	if r == nil || r.dimOutput == enabled {
+		return
+	}
+	r.dimOutput = enabled
+	r.tiles = make(map[cell.Cell][]byte)
+	r.footer = nil
+}
+
 func (r *Rasterizer) Draw(g *cell.Grid, dst []byte, width, height, stride int) error {
 	return r.DrawChanged(g, nil, dst, width, height, stride)
 }
@@ -259,7 +271,7 @@ func (r *Rasterizer) DrawChanged(g, previous *cell.Grid, dst []byte, width, heig
 
 func (r *Rasterizer) drawSmallFooter(g *cell.Grid, dst []byte, width, height, stride int) error {
 	if r.footer == nil {
-		r.footer = &Rasterizer{font: r.font, fonts: r.fonts}
+		r.footer = &Rasterizer{font: r.font, fonts: r.fonts, dimOutput: r.dimOutput}
 		if err := r.footer.SetPixelSize(max(1, int(r.ppem)*3/4)); err != nil {
 			return err
 		}
@@ -309,13 +321,14 @@ func (r *Rasterizer) drawGlyphCell(c cell.Cell, wide bool, dx, dy int, dst []byt
 	}
 	// ponytail: the canvas starts opaque black, so leave transparent/default and explicit black cells alone.
 	if bg.R != 0 || bg.G != 0 || bg.B != 0 || bg.A != 255 {
-		cellFill(dst, stride, dx, dy, cellWidth, r.cellH, width, height, bg)
+		cellFill(dst, stride, dx, dy, cellWidth, r.cellH, width, height, bg, r.dimOutput)
 	}
 	if c.Ch == ' ' {
 		return
 	}
 	mask := r.mask(c.Ch)
-	blit(dst, stride, dx, dy, width, height, mask, c.Fg, clipWidth)
+	underB, underG, underR, _ := premul(bg)
+	blit(dst, stride, dx, dy, width, height, mask, c.Fg, clipWidth, underB, underG, underR, r.dimOutput)
 }
 
 func metrics(face *font.Face, scale float32, pixelSize int) (cellW, cellH, base int) {
@@ -489,8 +502,11 @@ func clearOpaqueBlack(dst []byte, stride, x0, y0, cellW, cellH, width, height in
 	}
 }
 
-func cellFill(dst []byte, stride, x0, y0, cw, ch, width, height int, c color.RGBA) {
+func cellFill(dst []byte, stride, x0, y0, cw, ch, width, height int, c color.RGBA, dimOutput bool) {
 	b, g, r, a := premul(c)
+	if dimOutput {
+		b, g, r = b/3, g/3, r/3
+	}
 	x1 := min(x0+cw, width)
 	y1 := min(y0+ch, height)
 	for y := y0; y < y1; y++ {
@@ -505,7 +521,7 @@ func cellFill(dst []byte, stride, x0, y0, cw, ch, width, height int, c color.RGB
 	}
 }
 
-func blit(dst []byte, stride, x0, y0, width, height int, mask *image.Alpha, fg color.RGBA, clipWidth int) {
+func blit(dst []byte, stride, x0, y0, width, height int, mask *image.Alpha, fg color.RGBA, clipWidth int, underB, underG, underR byte, dimOutput bool) {
 	if mask == nil {
 		return
 	}
@@ -533,12 +549,24 @@ func blit(dst []byte, stride, x0, y0, width, height int, mask *image.Alpha, fg c
 			}
 			off := row + dx*4
 			if cov == 255 {
-				dst[off+0], dst[off+1], dst[off+2] = fb, fg2, fr
+				if dimOutput {
+					dst[off+0], dst[off+1], dst[off+2] = fb/3, fg2/3, fr/3
+				} else {
+					dst[off+0], dst[off+1], dst[off+2] = fb, fg2, fr
+				}
 				continue
 			}
-			dst[off+0] = mix(dst[off+0], fb, cov)
-			dst[off+1] = mix(dst[off+1], fg2, cov)
-			dst[off+2] = mix(dst[off+2], fr, cov)
+			baseB, baseG, baseR := dst[off+0], dst[off+1], dst[off+2]
+			if dimOutput {
+				baseB, baseG, baseR = underB, underG, underR
+				dst[off+0] = mix(baseB, fb, cov) / 3
+				dst[off+1] = mix(baseG, fg2, cov) / 3
+				dst[off+2] = mix(baseR, fr, cov) / 3
+			} else {
+				dst[off+0] = mix(baseB, fb, cov)
+				dst[off+1] = mix(baseG, fg2, cov)
+				dst[off+2] = mix(baseR, fr, cov)
+			}
 		}
 	}
 }

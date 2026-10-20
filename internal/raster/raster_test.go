@@ -79,6 +79,43 @@ func TestDrawsColouredGlyph(t *testing.T) {
 	}
 }
 
+func TestDrawChangedDimOutputMatchesPostPass(t *testing.T) {
+	raw := openTestFont(t)
+	dimmed := openTestFont(t)
+	dimmed.SetDimOutput(true)
+	previous, err := cell.Parse("\x1b[38;2;220;130;41m\x1b[48;2;179;91;28mA\x1b[0m\x1b[48;2;92;181;217m \x1b[0m", 3, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := cell.Parse("\x1b[38;2;220;130;41m\x1b[48;2;179;91;28mA\x1b[0m\x1b[48;2;92;181;217m \x1b[0m\x1b[38;2;26;117;241m\x1b[48;2;166;73;121mB\x1b[0m", 3, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	width, height := 3*raw.cellW, raw.cellH
+	stride := width * 4
+	rawPixels, dimPixels := make([]byte, stride*height), make([]byte, stride*height)
+	drawAndCompare := func(grid, old *cell.Grid) {
+		t.Helper()
+		if err := raw.DrawChanged(grid, old, rawPixels, width, height, stride); err != nil {
+			t.Fatal(err)
+		}
+		if err := dimmed.DrawChanged(grid, old, dimPixels, width, height, stride); err != nil {
+			t.Fatal(err)
+		}
+		want := append([]byte(nil), rawPixels...)
+		for i := 0; i < len(want); i += 4 {
+			want[i] /= 3
+			want[i+1] /= 3
+			want[i+2] /= 3
+		}
+		if !bytes.Equal(dimPixels, want) {
+			t.Fatal("dimmed incremental raster differs from post-draw integer dim")
+		}
+	}
+	drawAndCompare(previous, nil)
+	drawAndCompare(current, previous)
+}
+
 func TestBlankCellIsOpaqueBlack(t *testing.T) {
 	rz := openTestFont(t)
 	g, err := cell.Parse(" ", 1, 1)
