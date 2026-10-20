@@ -145,16 +145,17 @@ type Owner struct {
 	hasLatest      bool
 	pendingPaint   bool
 
-	effectID    string
-	theme       string
-	paused      bool
-	fps         int
-	lastTick    time.Time
-	tickPending bool
-	pending     map[chan workerAck]chan ControlReply
-	fatalOnAck  map[chan workerAck]bool
-	stopping    bool
-	ready       bool
+	effectID     string
+	theme        string
+	paused       bool
+	fps          int
+	lastTick     time.Time
+	tickPending  bool
+	tickDeferred bool // retry a due tick after the worker queue becomes available
+	pending      map[chan workerAck]chan ControlReply
+	fatalOnAck   map[chan workerAck]bool
+	stopping     bool
+	ready        bool
 }
 
 func NewOwner(cfg Config) (*Owner, error) {
@@ -626,6 +627,7 @@ func (o *Owner) loop(ctx context.Context, ready func()) error {
 		if err := o.drainWorker(); err != nil {
 			return err
 		}
+		o.retryDeferredTick()
 		if o.released {
 			released := o.released
 			o.released = false
@@ -654,12 +656,18 @@ func (o *Owner) waitAndDispatch(deadline time.Time) error {
 	if err := o.ctx.ControlFD(func(fd int) error { waylandFD = fd; return nil }); err != nil {
 		return HandleDisplayLost(err)
 	}
+	pollDeadline := deadline
+	if o.ready {
+		pollDeadline = o.tickDeadline()
+	}
 	timeout := -1
-	if !o.ready {
-		remaining := time.Until(deadline)
-		timeout = int(remaining / time.Millisecond)
-		if timeout < 0 {
+	if !pollDeadline.IsZero() {
+		remaining := time.Until(pollDeadline)
+		if remaining <= 0 {
 			timeout = 0
+		} else {
+			// Poll uses whole milliseconds; round up so a tick never fires early.
+			timeout = int((remaining-1)/time.Millisecond) + 1
 		}
 	}
 	fds := []unix.PollFd{{Fd: int32(waylandFD), Events: unix.POLLIN}, {Fd: int32(o.wakeRead), Events: unix.POLLIN}}
@@ -672,6 +680,9 @@ func (o *Owner) waitAndDispatch(deadline time.Time) error {
 		return HandleDisplayLost(err)
 	}
 	if n == 0 {
+		if o.ready {
+			o.onFrame(time.Now())
+		}
 		return nil
 	}
 	if fds[1].Revents&unix.POLLIN != 0 {
@@ -976,9 +987,13 @@ func (o *Owner) paintLatest() error {
 
 func (o *Owner) onFrame(now time.Time) {
 	if o.paused || o.stopping {
+		o.tickDeferred = false
 		return
 	}
-	if !o.tickPending && ShouldAdvance(o.lastTick, now, TickInterval(o.fps, o.cfg.BlurRadius)) {
+	if o.tickPending || o.frameCallback != nil {
+		return
+	}
+	if ShouldAdvance(o.lastTick, now, TickInterval(o.fps, o.cfg.BlurRadius)) {
 		elapsed := 50 * time.Millisecond
 		if !o.lastTick.IsZero() {
 			elapsed = now.Sub(o.lastTick)
@@ -986,14 +1001,34 @@ func (o *Owner) onFrame(now time.Time) {
 		if o.worker.submit(workerRequest{op: workerTick, elapsed: elapsed}) {
 			o.tickPending = true
 			o.lastTick = now
+			o.tickDeferred = false
 			return
 		}
+		o.tickDeferred = true
+		return
 	}
-	if !o.tickPending {
-		if err := o.armFrameOnly(); err != nil {
-			o.fatal = err
-		}
+	// The next poll sleeps to lastTick + TickInterval. Re-arming a frame
+	// callback here would require an empty surface commit.
+	o.tickDeferred = false
+}
+
+// tickDeadline provides one poll timeout while no compositor callback is pending.
+// A pending callback gates ticks on outputs that Niri has throttled while hidden.
+func (o *Owner) tickDeadline() time.Time {
+	if !o.ready || o.paused || o.stopping || o.tickPending || o.tickDeferred ||
+		o.frameCallback != nil || o.lastTick.IsZero() {
+		return time.Time{}
 	}
+	return o.lastTick.Add(TickInterval(o.fps, o.cfg.BlurRadius))
+}
+
+// retryDeferredTick waits for a worker wake instead of polling a full queue at 0ms.
+func (o *Owner) retryDeferredTick() {
+	if !o.tickDeferred || o.paused || o.stopping || o.tickPending || o.frameCallback != nil {
+		return
+	}
+	o.tickDeferred = false
+	o.onFrame(time.Now())
 }
 
 func (o *Owner) armFrameOnly() error {
