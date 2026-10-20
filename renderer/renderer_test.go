@@ -98,6 +98,75 @@ func TestRendererBGRAOpaque(t *testing.T) {
 		t.Fatal("glyph not BGRA")
 	}
 }
+
+func TestRendererDimOutput(t *testing.T) {
+	raw := newRenderer(t)
+	if err := raw.Step(); err != nil {
+		t.Fatal(err)
+	}
+	dimmed, err := New(Config{Effect: "rain", Palette: "nord", Width: 320, Height: 240, PixelSize: 12, DimOutput: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Reuse the same effect grid so the comparison is independent of its RNG.
+	dimmed.effect = raw.effect
+	dimmed.needsStep = false
+
+	want := make([]byte, 320*240*4)
+	got := make([]byte, len(want))
+	if _, err := raw.Draw(want, 320*4, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dimmed.Draw(got, 320*4, nil); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < len(want); i += 4 {
+		want[i] /= 3
+		want[i+1] /= 3
+		want[i+2] /= 3
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatal("dimmed output differs from post-draw integer dim")
+	}
+}
+
+func BenchmarkRendererDimOutputAt3440x1440(b *testing.B) {
+	const width, height = 3440, 1440
+	for _, tc := range []struct {
+		name     string
+		dim      bool
+		postPass bool
+	}{{"draw-copy-dim", false, true}, {"dim-during-draw-copy", true, false}} {
+		b.Run(tc.name, func(b *testing.B) {
+			r, err := New(Config{Effect: "rain", Palette: "nord", Width: width, Height: height, PixelSize: 12, DimOutput: tc.dim})
+			if err != nil {
+				b.Fatal(err)
+			}
+			background := make([]byte, width*height*4)
+			submitted := make([]byte, len(background))
+			b.SetBytes(int64(len(background)))
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				if err := r.Step(); err != nil {
+					b.Fatal(err)
+				}
+				if _, err := r.Draw(background, width*4, nil); err != nil {
+					b.Fatal(err)
+				}
+				copy(submitted, background)
+				if tc.postPass {
+					for i := 0; i < len(submitted); i += 4 {
+						submitted[i] /= 3
+						submitted[i+1] /= 3
+						submitted[i+2] /= 3
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestRendererPauseDoesNoWork(t *testing.T) {
 	r := newRenderer(t)
 	_ = r.Step()

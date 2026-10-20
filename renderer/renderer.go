@@ -17,6 +17,7 @@ import (
 type Config struct {
 	Effect, Palette, Font, Text string
 	Width, Height, PixelSize    int
+	DimOutput                   bool // integer-divide output RGB bytes by three; alpha is unchanged
 }
 
 // Frame is immutable history for a specific caller-owned pixel buffer.
@@ -105,6 +106,7 @@ func New(cfg Config) (*Renderer, error) {
 	if err != nil {
 		return nil, err
 	}
+	rz.SetDimOutput(cfg.DimOutput)
 	cw, ch := rz.CellSize()
 	cols, rows, err := geometry(cfg.Width, cfg.Height, cw, ch, cfg.Text != "")
 	if err != nil {
