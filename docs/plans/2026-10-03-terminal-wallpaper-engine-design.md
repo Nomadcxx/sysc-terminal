@@ -166,19 +166,21 @@ pause flag. Effect `Update`/`Render` run on single worker that submits
 immutable cell grid back over capacity-1 channel, latest wins. Effects
 must not start goroutines.
 
-**One clock, not two.** Earlier revision specified both "a 50 ms ticker
-while playing" and "a frame callback rasterizes if a tick is due",
-two sources of truth for same decision, can disagree. Frame
-callback = only clock:
+**One tick deadline, frame callback gate.** The next effect tick is due at
+`lastTick + TickInterval`; it is not quantized to display refresh. When no
+frame callback is pending, the owner passes that deadline to its existing
+Wayland poll as a timeout. It does not keep a repeating ticker or add a
+timerfd. A callback requested with each painted buffer gates the next tick
+while Niri throttles an occluded output. If that callback arrives after the
+deadline, the owner advances immediately; if it arrives early, the poll sleeps
+until the deadline. This keeps hidden outputs idle and limits visible output to
+the configured cadence.
 
-- Compositor `wl_surface.frame` callback only thing that
-  requests frame. The owner advances at most once per 120 ms (8.3 FPS),
-  leaving 30 ms of CPU per frame within the 25% one-core budget.
-  60 Hz and 144 Hz displays use the same limit. Display that stops
-  sending callbacks stops engine, which is what 1 Hz link or
-  occluded-and-idle surface should do anyway.
-- If previous tick still in flight when callback arrives, tick dropped. Same rule as capacity-1 channel latest-wins, not
-  a second one: never more than one frame pending, in either place.
+- A callback without a due tick does not re-arm itself. Re-arming requires an
+  empty surface commit, which redraws the output without changing the buffer.
+- If a previous tick is still in flight when a callback arrives, the owner
+  drops that tick. The capacity-1 frame channel keeps the latest result; never
+  keep more than one frame pending in either place.
 - Paused: no `Surface.Frame` request, no `Update`/`Render` call. Last buffer stays attached. Resume must request **one** `Surface.Frame` to
   restart callback chain; without it first live pause/resume hangs
   on frozen buffer until something else damages surface. "Paused CPU
