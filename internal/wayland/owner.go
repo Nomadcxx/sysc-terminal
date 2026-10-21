@@ -34,12 +34,13 @@ var (
 )
 
 type Config struct {
-	Output     string
-	Effect     string
-	Theme      string
-	Artwork    string
-	Font       string
-	BlurRadius int
+	Output          string
+	Effect          string
+	Theme           string
+	Artwork         string
+	ANSILoveBackend string
+	Font            string
+	BlurRadius      int
 	// FPS caps the tick rate. Zero means MaxFPS. Out-of-range values are
 	// clamped, so a hand-edited config cannot exceed the CPU budget.
 	FPS int
@@ -174,9 +175,9 @@ func NewOwner(cfg Config) (*Owner, error) {
 	var initial *effect.Effect
 	var err error
 	if cfg.Artwork != "" {
-		initial, err = effect.NewFromFile(cfg.Effect, cfg.Theme, effect.MinimumCols, effect.MinimumRows, cfg.Artwork)
+		initial, err = effect.NewFromFileWithOptions(cfg.Effect, cfg.Theme, effect.MinimumCols, effect.MinimumRows, cfg.Artwork, effect.Options{ANSILoveBackend: cfg.ANSILoveBackend})
 	} else {
-		initial, err = effect.New(cfg.Effect, cfg.Theme, effect.MinimumCols, effect.MinimumRows, "")
+		initial, err = effect.NewWithOptions(cfg.Effect, cfg.Theme, effect.MinimumCols, effect.MinimumRows, "", effect.Options{ANSILoveBackend: cfg.ANSILoveBackend})
 	}
 	if err != nil {
 		return nil, err

@@ -34,6 +34,27 @@ func TestRendererMatchesInternalPipeline(t *testing.T) {
 		}
 	}
 }
+
+func TestANSILoveBackendConfig(t *testing.T) {
+	r, err := New(Config{
+		Effect: "ansi-love", Palette: "nord", Width: 320, Height: 240,
+		PixelSize: 12, ANSILoveBackend: "quad",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Step(); err != nil {
+		t.Fatal(err)
+	}
+	for y := 0; y < r.effect.Grid().Rows; y++ {
+		for x := 0; x < r.effect.Grid().Cols; x++ {
+			if c := r.effect.Grid().At(x, y); c.Ch >= 0x2580 && c.Ch <= 0x259F {
+				return
+			}
+		}
+	}
+	t.Fatal("renderer ignored the configured ANSI Love backend")
+}
 func TestRendererResizeInvalidatesPreviousFrame(t *testing.T) {
 	r := newRenderer(t)
 	_ = r.Step()

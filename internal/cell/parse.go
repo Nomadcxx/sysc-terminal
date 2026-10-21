@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"strconv"
 	"unicode/utf8"
 
 	"github.com/mattn/go-runewidth"
@@ -18,10 +19,35 @@ func Parse(s string, cols, rows int) (*Grid, error) {
 	}
 	g := newGrid(cols, rows)
 	fg, bg := DefaultFg, DefaultBg
+	reverse := false
 	x, y := 0, 0
+	lastRune := rune(0)
 	for i := 0; i < len(s); {
 		if s[i] == 0x1b {
-			i = applyEscape(s, i, &fg, &bg)
+			if i+1 < len(s) && s[i+1] == '[' {
+				end := i + 2
+				for end < len(s) && !(s[end] >= 0x40 && s[end] <= 0x7e) {
+					end++
+				}
+				if end < len(s) && s[end] == 'b' {
+					count, ok := parseREPCount(s[i+2:end], cols-x)
+					if ok && lastRune == ' ' {
+						visibleFg, visibleBg := fg, bg
+						if reverse {
+							visibleFg, visibleBg = bg, fg
+						}
+						for range count {
+							if y >= 0 && y < rows && x >= 0 && x < cols {
+								g.cells[y*cols+x] = Cell{Ch: ' ', Fg: visibleFg, Bg: visibleBg}
+							}
+							x++
+						}
+					}
+					i = end + 1
+					continue
+				}
+			}
+			i = applyEscape(s, i, &fg, &bg, &reverse)
 			continue
 		}
 		if s[i] == 0x07 {
@@ -54,23 +80,39 @@ func Parse(s string, cols, rows int) (*Grid, error) {
 			continue
 		}
 		if y < rows && x < cols && x+width <= cols {
-			g.cells[y*cols+x] = Cell{Ch: r, Fg: fg, Bg: bg}
+			visibleFg, visibleBg := fg, bg
+			if reverse {
+				visibleFg, visibleBg = bg, fg
+			}
+			g.cells[y*cols+x] = Cell{Ch: r, Fg: visibleFg, Bg: visibleBg}
 			if width == 2 {
-				g.cells[y*cols+x+1] = Cell{Ch: 0, Fg: fg, Bg: bg}
+				g.cells[y*cols+x+1] = Cell{Ch: 0, Fg: visibleFg, Bg: visibleBg}
 			}
 		}
 		x += width
+		lastRune = r
 	}
 	return g, nil
 }
 
-func applyEscape(s string, i int, fg, bg *color.RGBA) int {
+func parseREPCount(params string, remaining int) (int, bool) {
+	if remaining <= 0 {
+		return 0, false
+	}
+	if params == "" {
+		return 1, true
+	}
+	n, err := strconv.Atoi(params)
+	return n, err == nil && n > 0 && n <= remaining
+}
+
+func applyEscape(s string, i int, fg, bg *color.RGBA, reverse *bool) int {
 	if i+1 >= len(s) {
 		return i + 1
 	}
 	switch s[i+1] {
 	case '[':
-		return parseCSI(s, i+2, fg, bg)
+		return parseCSI(s, i+2, fg, bg, reverse)
 	case ']', 'P', '_', '^', 'X':
 		return skipTerminated(s, i+2)
 	default:
@@ -91,14 +133,14 @@ func skipTerminated(s string, i int) int {
 	return i
 }
 
-func parseCSI(s string, i int, fg, bg *color.RGBA) int {
+func parseCSI(s string, i int, fg, bg *color.RGBA, reverse *bool) int {
 	start := i
 	for i < len(s) {
 		c := s[i]
 		i++
 		if c >= 0x40 && c <= 0x7e {
 			if c == 'm' {
-				applySGR(s[start:i-1], fg, bg)
+				applySGR(s[start:i-1], fg, bg, reverse)
 			}
 			return i
 		}
@@ -106,12 +148,17 @@ func parseCSI(s string, i int, fg, bg *color.RGBA) int {
 	return i
 }
 
-func applySGR(params string, fg, bg *color.RGBA) {
+func applySGR(params string, fg, bg *color.RGBA, reverse *bool) {
 	for start := 0; start <= len(params); {
 		p, next, _ := sgrField(params, start)
 		switch p {
 		case "", "0":
 			*fg, *bg = DefaultFg, DefaultBg
+			*reverse = false
+		case "7":
+			*reverse = true
+		case "27":
+			*reverse = false
 		case "38", "48":
 			mode, afterMode, modeOK := sgrField(params, next)
 			red, afterRed, redOK := sgrField(params, afterMode)

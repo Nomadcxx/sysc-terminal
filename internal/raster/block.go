@@ -27,6 +27,21 @@ var lightBox = map[rune]uint8{
 // lower-right bits.
 var quadrants = [...]uint8{4, 8, 1, 1 | 4 | 8, 1 | 8, 1 | 2 | 4, 1 | 2 | 8, 2, 2 | 4, 2 | 4 | 8}
 
+func sextantMask(ch rune) (uint8, bool) {
+	const first = rune(0x1FB00)
+	i := int(ch - first)
+	switch {
+	case i >= 0 && i < 20:
+		return uint8(i + 1), true
+	case i >= 20 && i < 40:
+		return uint8(i + 2), true
+	case i >= 40 && i < 60:
+		return uint8(i + 3), true
+	default:
+		return 0, false
+	}
+}
+
 // blockMask is the cell-sized coverage for a block element or light box
 // line, or nil for runes the font draws. The set is fixed, so the per-size
 // cache is bounded without eviction.
@@ -34,7 +49,8 @@ func (r *Rasterizer) blockMask(ch rune) *image.Alpha {
 	if m, ok := r.blocks[ch]; ok {
 		return m
 	}
-	if _, box := lightBox[ch]; !box && (ch < '▀' || ch > '▟') {
+	_, sextant := sextantMask(ch)
+	if _, box := lightBox[ch]; !box && !sextant && (ch < '▀' || ch > '▟') {
 		return nil // ordinary glyphs take the font path without allocating
 	}
 	w, h := r.cellW, r.cellH
@@ -50,7 +66,16 @@ func (r *Rasterizer) blockMask(ch rune) *image.Alpha {
 	eighths := func(x0, y0, x1, y1 int) image.Rectangle {
 		return image.Rect(w*x0/8, h*y0/8, w*x1/8, h*y1/8)
 	}
+	mask, isSextant := sextantMask(ch)
 	switch {
+	case isSextant:
+		for row := 0; row < 3; row++ {
+			for col := 0; col < 2; col++ {
+				if mask&(1<<uint(row*2+col)) != 0 {
+					fill(image.Rect(w*col/2, h*row/3, w*(col+1)/2, h*(row+1)/3), 255)
+				}
+			}
+		}
 	case ch == '▀':
 		fill(eighths(0, 0, 8, 4), 255)
 	case ch >= '▁' && ch <= '█':

@@ -44,6 +44,20 @@ palette, and apply it to an output.
 `--effect ak-47-text --file /path/to/art.txt`; it follows the same 14-second
 loop. The file must contain literal UTF-8 artwork within 64 KiB.
 
+### ANSI Love
+
+`--effect ansi-love` shows Warpus's December 2019 artwork with Sextant glyphs,
+original VGA colours, subtle motion, and a vertical camera tour. Use
+`--ansi-love-backend quad` for quadrant blocks; `auto`, `exact`, `half`,
+`octant`, `braille-two-color`, and `braille-fg` are also supported. The chosen
+backend persists when the control socket changes effects. Pause freezes the
+scene; resume continues its active timeline.
+
+This integration needs the pending sysc-Go ANSI Love release. The dependency
+stays at its current tag until RAMA publishes that release; development uses a
+local Go workspace.
+See [third-party notices](THIRD_PARTY_NOTICES.md) for artwork provenance.
+
 ### AUR
 
 On Arch, install [sysc-terminal](https://aur.archlinux.org/packages/sysc-terminal) with

@@ -44,6 +44,7 @@ func parseArgs(args []string) (commandLine, error) {
 	fs.StringVar(&parsed.owner.Output, "output", "", "output connector name")
 	fs.StringVar(&parsed.owner.Effect, "effect", "fire", "sysc-Go effect id")
 	fs.StringVar(&parsed.owner.Theme, "theme", "nord", "sysc-Go theme name")
+	fs.StringVar(&parsed.owner.ANSILoveBackend, "ansi-love-backend", "sextant", "ANSI Love backend (sextant, quad, braille-fg, etc.)")
 	fs.StringVar(&parsed.owner.Artwork, "file", "", "artwork file for text effects")
 	fs.StringVar(&parsed.owner.Font, "font", "", "monospace font path")
 	fs.IntVar(&parsed.owner.BlurRadius, "blur", 0, "wallpaper blur strength 0..64 (0 off)")
@@ -184,6 +185,7 @@ Usage: sysc-terminal [flags]
       --output name       output connector (one process per output)
       --effect id         sysc-Go effect id (default fire)
       --theme name        sysc-Go theme (default nord)
+      --ansi-love-backend name ANSI Love backend (default sextant)
       --file path         artwork for text effects
       --font path         monospace font path
       --blur strength     wallpaper blur 0..64 output pixels (default 0, off)

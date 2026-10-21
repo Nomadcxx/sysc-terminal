@@ -141,6 +141,40 @@ func TestSGRSubsetAppliesRGBAndReset(t *testing.T) {
 	}
 }
 
+func TestSGRReverseSwapsDisplayedColors(t *testing.T) {
+	g, err := Parse("\x1b[48;2;1;2;3;38;2;4;5;6mA\x1b[7mB\x1b[27mC\x1b[0mD", 4, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	red := color.RGBA{R: 4, G: 5, B: 6, A: 255}
+	blue := color.RGBA{R: 1, G: 2, B: 3, A: 255}
+	if got := g.At(0, 0); got.Fg != red || got.Bg != blue {
+		t.Fatalf("normal colors = %+v, want fg=%+v bg=%+v", got, red, blue)
+	}
+	if got := g.At(1, 0); got.Fg != blue || got.Bg != red {
+		t.Fatalf("reverse colors = %+v, want fg=%+v bg=%+v", got, blue, red)
+	}
+	if got := g.At(2, 0); got.Fg != red || got.Bg != blue {
+		t.Fatalf("normal after reverse = %+v, want fg=%+v bg=%+v", got, red, blue)
+	}
+	if got := g.At(3, 0); got.Fg != DefaultFg || got.Bg != DefaultBg {
+		t.Fatalf("reset after reverse = %+v, want terminal defaults", got)
+	}
+}
+
+func TestREPExpandsSpacesUsingCurrentStyle(t *testing.T) {
+	g, err := Parse("\x1b[48;2;1;2;3m \x1b[4b", 5, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := color.RGBA{R: 1, G: 2, B: 3, A: 255}
+	for x := 0; x < g.Cols; x++ {
+		if got := g.At(x, 0); got.Ch != ' ' || got.Bg != want {
+			t.Fatalf("cell %d = %+v, want styled space with bg %+v", x, got, want)
+		}
+	}
+}
+
 func TestRejectsOversizedFrame(t *testing.T) {
 	const frameLimit = 16 << 20
 	if _, err := Parse(strings.Repeat("x", frameLimit+1), 1, 1); err == nil {

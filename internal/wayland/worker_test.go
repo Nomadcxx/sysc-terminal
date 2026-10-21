@@ -359,6 +359,32 @@ func TestEffectWorkerChangeAndResize(t *testing.T) {
 	}
 }
 
+func TestEffectWorkerPreservesANSILoveBackendOnChange(t *testing.T) {
+	e, err := effect.NewWithOptions("ansi-love", "nord", 80, 24, "", effect.Options{ANSILoveBackend: "quad"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := newEffectWorker(e, "ansi-love", "nord", func() {})
+	defer w.close()
+	_ = receiveFrame(t, w.frames)
+
+	change := make(chan workerAck, 1)
+	if !w.submit(workerRequest{op: workerChange, id: "ansi-love", theme: "nord", reply: change}) {
+		t.Fatal("change request was rejected")
+	}
+	if ack := receiveAck(t, w.acks); ack.err != nil {
+		t.Fatalf("change result = %+v", ack)
+	}
+	frame := receiveFrame(t, w.frames)
+	for y := 0; y < frame.grid.Rows; y++ {
+		for x := 0; x < frame.grid.Cols; x++ {
+			if c := frame.grid.At(x, y); c.Ch >= 0x1FB00 && c.Ch <= 0x1FB3B {
+				t.Fatal("effect change discarded the configured Quad backend")
+			}
+		}
+	}
+}
+
 func TestEffectWorkerResizeWhilePausedPublishesFrame(t *testing.T) {
 	e, err := effect.New("fire", "nord", 80, 24, "")
 	if err != nil {

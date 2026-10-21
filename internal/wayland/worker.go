@@ -117,10 +117,11 @@ func (w *effectWorker) run(current *effect.Effect, id, theme string) {
 				current.SetPaused(paused)
 			case workerChange:
 				var next *effect.Effect
+				options := current.Options()
 				if req.file != "" {
-					next, err = effect.NewFromFile(req.id, req.theme, current.EffectWidth(), current.EffectHeight(), req.file)
+					next, err = effect.NewFromFileWithOptions(req.id, req.theme, current.EffectWidth(), current.EffectHeight(), req.file, options)
 				} else {
-					next, err = effect.New(req.id, req.theme, current.EffectWidth(), current.EffectHeight(), "")
+					next, err = effect.NewWithOptions(req.id, req.theme, current.EffectWidth(), current.EffectHeight(), "", options)
 				}
 				if err == nil {
 					next.SetCellAspect(cellW, cellH)

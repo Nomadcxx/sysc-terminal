@@ -476,6 +476,73 @@ func TestBlockElementsTileWithoutSeams(t *testing.T) {
 	}
 }
 
+func TestSextantMasksUseExactCoverage(t *testing.T) {
+	const cellW, cellH = 5, 7
+	rz := &Rasterizer{cellW: cellW, cellH: cellH}
+	seen := make(map[rune]bool, 64)
+	for mask := uint8(0); mask < 64; mask++ {
+		var ch rune
+		switch mask {
+		case 0:
+			ch = ' '
+		case 21:
+			ch = '▌'
+		case 42:
+			ch = '▐'
+		case 63:
+			ch = '█'
+		default:
+			offset := int(mask) - 1
+			if mask > 21 {
+				offset--
+			}
+			if mask > 42 {
+				offset--
+			}
+			ch = rune(0x1FB00 + offset)
+		}
+		if seen[ch] {
+			t.Fatalf("mask %06b duplicates rune U+%04X", mask, ch)
+		}
+		seen[ch] = true
+
+		coverage := rz.blockMask(ch)
+		if ch == ' ' {
+			if coverage != nil {
+				t.Fatal("zero mask should use the blank glyph path")
+			}
+		} else if coverage == nil {
+			t.Fatalf("mask %06b rune U+%04X has no procedural coverage", mask, ch)
+		}
+		for y := 0; y < cellH; y++ {
+			row := 0
+			if y >= cellH/3 {
+				row = 1
+			}
+			if y >= 2*cellH/3 {
+				row = 2
+			}
+			for x := 0; x < cellW; x++ {
+				col := 0
+				if x >= cellW/2 {
+					col = 1
+				}
+				want := byte(0)
+				if mask&(1<<uint(row*2+col)) != 0 {
+					want = 255
+				}
+				got := byte(0)
+				if coverage != nil {
+					got = coverage.AlphaAt(x, y).A
+				}
+				if got != want {
+					t.Fatalf("mask %06b rune U+%04X pixel (%d,%d) = %d, want %d", mask, ch, x, y, got, want)
+				}
+			}
+		}
+	}
+}
+
 func TestSmallFooterFixedAtRight(t *testing.T) {
 	rz := openTestFont(t)
 	cw, ch := rz.CellSize()

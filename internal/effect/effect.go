@@ -15,6 +15,23 @@ const (
 	MinimumRows = 24
 )
 
+// Options controls effect-specific defaults.
+type Options struct {
+	// ANSILoveBackend selects the ANSI Love renderer; empty defaults to Sextant.
+	ANSILoveBackend string
+}
+
+var ansiLoveBackends = map[string]animations.ANSILoveBackend{
+	"auto":              animations.ANSILoveAuto,
+	"exact":             animations.ANSILoveExact,
+	"half":              animations.ANSILoveHalf,
+	"quad":              animations.ANSILoveQuad,
+	"sextant":           animations.ANSILoveSextant,
+	"octant":            animations.ANSILoveOctant,
+	"braille-two-color": animations.ANSILoveBrailleTwoColor,
+	"braille-fg":        animations.ANSILoveBrailleFG,
+}
+
 type ticker interface {
 	Update()
 	Render() string
@@ -22,6 +39,7 @@ type ticker interface {
 
 type Effect struct {
 	id, theme, text string
+	options         Options
 	w, h            int
 	cellW, cellH    int
 	paused          bool
@@ -31,8 +49,19 @@ type Effect struct {
 }
 
 func New(id, theme string, cols, rows int, text string) (*Effect, error) {
+	return NewWithOptions(id, theme, cols, rows, text, Options{})
+}
+
+// NewWithOptions creates an effect with explicit effect-specific options.
+func NewWithOptions(id, theme string, cols, rows int, text string, options Options) (*Effect, error) {
 	if !effectAvailable(id) {
 		return nil, fmt.Errorf("unknown effect %q", id)
+	}
+	if options.ANSILoveBackend == "" {
+		options.ANSILoveBackend = "sextant"
+	}
+	if _, ok := ansiLoveBackends[options.ANSILoveBackend]; !ok {
+		return nil, fmt.Errorf("unknown ANSI Love backend %q", options.ANSILoveBackend)
 	}
 	if animations.GetThemeMetadata(theme) == nil {
 		return nil, fmt.Errorf("unknown theme %q", theme)
@@ -49,19 +78,24 @@ func New(id, theme string, cols, rows int, text string) (*Effect, error) {
 	} else {
 		rows = max(4, rows)
 	}
-	fx, err := construct(id, theme, cols, rows, text)
+	fx, err := construct(id, theme, cols, rows, text, options)
 	if err != nil {
 		return nil, err
 	}
-	return &Effect{id: id, theme: theme, text: text, w: cols, h: rows, fx: fx}, nil
+	return &Effect{id: id, theme: theme, text: text, options: options, w: cols, h: rows, fx: fx}, nil
 }
 
 func NewFromFile(id, theme string, cols, rows int, path string) (*Effect, error) {
+	return NewFromFileWithOptions(id, theme, cols, rows, path, Options{})
+}
+
+// NewFromFileWithOptions creates a file-backed effect with explicit options.
+func NewFromFileWithOptions(id, theme string, cols, rows int, path string, options Options) (*Effect, error) {
 	text, err := asset.ReadArtwork(path)
 	if err != nil {
 		return nil, err
 	}
-	return New(id, theme, cols, rows, text)
+	return NewWithOptions(id, theme, cols, rows, text, options)
 }
 
 func (e *Effect) Tick() error {
@@ -99,7 +133,7 @@ func (e *Effect) render() error {
 	if err != nil {
 		return err
 	}
-	g.SmallFooter = e.id == "ak-47" || e.id == "ak-47-text"
+	g.SmallFooter = e.id == "ak-47" || e.id == "ak-47-text" || e.id == "ansi-love"
 	e.grid = g
 	e.gen++
 	return nil
@@ -112,11 +146,14 @@ func (e *Effect) EffectWidth() int  { return e.w }
 func (e *Effect) EffectHeight() int { return e.h }
 func (e *Effect) SetPaused(p bool)  { e.paused = p }
 
+// Options returns the normalized options used to construct the effect.
+func (e *Effect) Options() Options { return e.options }
+
 func (e *Effect) Reset() error {
 	if e == nil {
 		return fmt.Errorf("nil effect")
 	}
-	fx, err := construct(e.id, e.theme, e.w, e.h, e.text)
+	fx, err := construct(e.id, e.theme, e.w, e.h, e.text, e.options)
 	if err != nil {
 		return err
 	}
@@ -148,7 +185,7 @@ func (e *Effect) SetText(text string) error {
 		return fmt.Errorf("effect %q requires artwork", e.id)
 	}
 	if e.id == "ak-47-text" {
-		fx, err := construct(e.id, e.theme, e.w, e.h, text)
+		fx, err := construct(e.id, e.theme, e.w, e.h, text, e.options)
 		if err != nil {
 			return err
 		}
@@ -187,7 +224,7 @@ func (e *Effect) Resize(cols, rows int) error {
 		r.Resize(cols, rows)
 		return nil
 	}
-	fx, err := construct(e.id, e.theme, cols, rows, e.text)
+	fx, err := construct(e.id, e.theme, cols, rows, e.text, e.options)
 	if err != nil {
 		return err
 	}
@@ -227,7 +264,7 @@ func List() string {
 
 func effectAvailable(id string) bool {
 	switch id {
-	case "ak-47-rama", "justice-cross":
+	case "ak-47-rama", "justice-cross", "l2a1-sar":
 		return false
 	default:
 		return animations.GetEffectMetadata(id) != nil
@@ -243,8 +280,13 @@ func requiresText(id string) bool {
 	return false
 }
 
-func construct(id, theme string, w, h int, text string) (ticker, error) {
+func construct(id, theme string, w, h int, text string, options Options) (ticker, error) {
 	switch id {
+	case "ansi-love":
+		return animations.NewANSILoveEffectConfig(animations.ANSILoveConfig{
+			Width: w, Height: h, Theme: theme, Backend: ansiLoveBackends[options.ANSILoveBackend],
+			Motion: animations.ANSILoveMotionSubtle,
+		})
 	case "ak-47-text":
 		return animations.NewAK47TextEffect(w, h, theme, text)
 	case "ak-47":

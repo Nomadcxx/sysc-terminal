@@ -16,6 +16,7 @@ import (
 
 type Config struct {
 	Effect, Palette, Font, Text string
+	ANSILoveBackend             string
 	Width, Height, PixelSize    int
 	DimOutput                   bool // integer-divide output RGB bytes by three; alpha is unchanged
 }
@@ -112,7 +113,7 @@ func New(cfg Config) (*Renderer, error) {
 	if err != nil {
 		return nil, err
 	}
-	fx, err := effect.New(cfg.Effect, cfg.Palette, cols, rows, cfg.Text)
+	fx, err := effect.NewWithOptions(cfg.Effect, cfg.Palette, cols, rows, cfg.Text, effect.Options{ANSILoveBackend: cfg.ANSILoveBackend})
 	if err != nil {
 		return nil, err
 	}
