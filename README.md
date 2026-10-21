@@ -44,6 +44,11 @@ palette, and apply it to an output.
 `--effect ak-47-text --file /path/to/art.txt`; it follows the same 14-second
 loop. The file must contain literal UTF-8 artwork within 64 KiB.
 
+### Australian L2A1 SAR
+
+`l2a1-sar` rotates the braille model twice, then swirls and reconstructs it.
+The animation displays `L2A1 SAR / notcplkerry / CC BY 4.0`.
+
 ### AUR
 
 On Arch, install [sysc-terminal](https://aur.archlinux.org/packages/sysc-terminal) with
@@ -91,7 +96,7 @@ Socket verbs: `query`, `fps [n]`, `pause`, `resume`, `change effect <id> theme <
 
 ## Build
 
-Pins Go 1.26, sysc-Go `v1.0.6-0.20261008172414-1ff1f6c3c8d0` and sysc-wayland `v0.3.1`. Niri
+Pins Go 1.26, sysc-Go `v1.0.9-0.20261021034114-dfa0edf5fa0f` and sysc-wayland `v0.3.1`. Niri
 first, no CGO.
 
 ```bash
@@ -188,6 +193,10 @@ The AK-47 effect includes model data from ["AK-47" by Lokeig](https://skfb.ly/oy
 licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
 That asset retains its noncommercial restriction. The adaptation samples the
 mesh into braille surface points and adds rotation and a particle morph.
+
+The Australian L2A1 SAR effect includes model data from ["low-poly Australian L2A1 SAR" by notcplkerry](https://skfb.ly/oErMB),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The animation displays `L2A1 SAR / notcplkerry / CC BY 4.0`.
 
 ---
 

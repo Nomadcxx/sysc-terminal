@@ -99,7 +99,7 @@ func (e *Effect) render() error {
 	if err != nil {
 		return err
 	}
-	g.SmallFooter = e.id == "ak-47" || e.id == "ak-47-text"
+	g.SmallFooter = e.id == "ak-47" || e.id == "ak-47-text" || e.id == "l2a1-sar"
 	e.grid = g
 	e.gen++
 	return nil
@@ -249,6 +249,8 @@ func construct(id, theme string, w, h int, text string) (ticker, error) {
 		return animations.NewAK47TextEffect(w, h, theme, text)
 	case "ak-47":
 		return animations.NewAK47Effect(w, h, theme), nil
+	case "l2a1-sar":
+		return animations.NewL2A1SAREffect(w, h, theme), nil
 	case "great-wave":
 		return animations.NewGreatWaveEffect(w, h, theme)
 	case "wasteland":
