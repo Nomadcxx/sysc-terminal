@@ -466,6 +466,30 @@ func TestAK47FixedCredit(t *testing.T) {
 	}
 }
 
+func TestL2A1SARFixedCredit(t *testing.T) {
+	if !strings.Contains(List(), "effect l2a1-sar 0\n") {
+		t.Fatal("missing standalone L2A1 SAR")
+	}
+	e, err := New("l2a1-sar", "kanagawa", 80, 24, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = e.TickElapsed(0); err != nil {
+		t.Fatal(err)
+	}
+	g := e.Grid()
+	if !g.SmallFooter {
+		t.Fatal("L2A1 SAR credit not marked for small fixed rendering")
+	}
+	var footer strings.Builder
+	for x := 0; x < g.Cols; x++ {
+		footer.WriteRune(g.At(x, g.Rows-1).Ch)
+	}
+	if !strings.HasSuffix(footer.String(), "L2A1 SAR / notcplkerry / CC BY 4.0") {
+		t.Fatalf("upstream credit lost: %q", footer.String())
+	}
+}
+
 func TestAK47Artwork(t *testing.T) {
 	for _, id := range []string{"ak-47-text"} {
 		e, err := New(id, "kanagawa", 80, 24, "XX  XX\n XXXX")
