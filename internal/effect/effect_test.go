@@ -490,6 +490,42 @@ func TestL2A1SARFixedCredit(t *testing.T) {
 	}
 }
 
+func TestRotatingStatuesListConstructAndKeepCredit(t *testing.T) {
+	models := []struct{ id, credit string }{
+		{"jesus-christ-statue", "Jesus Christ Statue / amcgi / CC BY 4.0"},
+		{"jason", "Jason / noe-3d.at / CC BY-NC 4.0"},
+		{"nymphe-der-flora", "Nymphe der Flora / noe-3d.at / CC BY-NC 4.0"},
+		{"lowe", "Löwe / noe-3d.at / CC BY-NC 4.0"},
+		{"roman-gladiator", "Sculpture of a Roman gladiator / Virtual Museums of Małopolska / CC BY 4.0"},
+		{"grabfigur", "Grabfigur / noe-3d.at / CC BY-NC 4.0"},
+	}
+	for _, model := range models {
+		t.Run(model.id, func(t *testing.T) {
+			if !strings.Contains(List(), "effect "+model.id+" 0\n") {
+				t.Fatalf("--list omitted %q", model.id)
+			}
+			e, err := New(model.id, "kanagawa", 80, 24, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = e.TickElapsed(0); err != nil {
+				t.Fatal(err)
+			}
+			g := e.Grid()
+			if !g.SmallFooter {
+				t.Fatal("statue credit not marked for fixed-footer rendering")
+			}
+			var footer strings.Builder
+			for x := 0; x < g.Cols; x++ {
+				footer.WriteRune(g.At(x, g.Rows-1).Ch)
+			}
+			if !strings.HasSuffix(footer.String(), model.credit) {
+				t.Fatalf("model credit lost: %q", footer.String())
+			}
+		})
+	}
+}
+
 func TestAK47Artwork(t *testing.T) {
 	for _, id := range []string{"ak-47-text"} {
 		e, err := New(id, "kanagawa", 80, 24, "XX  XX\n XXXX")
