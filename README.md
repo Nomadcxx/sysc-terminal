@@ -49,6 +49,13 @@ loop. The file must contain literal UTF-8 artwork within 64 KiB.
 `l2a1-sar` rotates the braille model twice, then swirls and reconstructs it.
 The animation displays `L2A1 SAR / notcplkerry / CC BY 4.0`.
 
+### Rotating statue effects
+
+`jesus-christ-statue`, `jason`, `nymphe-der-flora`, `lowe`, `roman-gladiator`,
+and `grabfigur` rotate upright around their vertical axis with a fixed camera
+elevation. Each braille frame displays the model title, creator, and license.
+`sysc-terminal --list` reports all six IDs for the sysc-shell Terminal Art panel.
+
 ### AUR
 
 On Arch, install [sysc-terminal](https://aur.archlinux.org/packages/sysc-terminal) with
@@ -197,6 +204,20 @@ mesh into braille surface points and adds rotation and a particle morph.
 The Australian L2A1 SAR effect includes model data from ["low-poly Australian L2A1 SAR" by notcplkerry](https://skfb.ly/oErMB),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 The animation displays `L2A1 SAR / notcplkerry / CC BY 4.0`.
+
+The rotating statue effects include model-derived samples from these works:
+
+| Model | Creator | Source | License |
+|---|---|---|---|
+| Jesus Christ Statue | amcgi | [Sketchfab](https://sketchfab.com/3d-models/jesus-christ-statue-375d626ccd524c439e9dc81c1033828e) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| Jason | noe-3d.at | [Sketchfab](https://sketchfab.com/3d-models/jason-e7da6b09d300488e93fbe384412b8b18) | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) |
+| Nymphe der Flora | noe-3d.at | [Sketchfab](https://sketchfab.com/3d-models/nymphe-der-flora-f1f4fca883954c0e9ac2bda9e865b144) | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) |
+| Löwe | noe-3d.at | [Sketchfab](https://sketchfab.com/3d-models/lowe-7e78d1f7fe04481697f1388ebba6ef9f) | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) |
+| Sculpture of a Roman gladiator | Virtual Museums of Małopolska | [Sketchfab](https://sketchfab.com/3d-models/sculpture-of-a-roman-gladiator-ca42e593d8aa4b2894dc2b288f595af5) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| Grabfigur | noe-3d.at | [Sketchfab](https://sketchfab.com/3d-models/grabfigur-0c69e48471de4467aba03c5767164237) | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) |
+
+The four CC BY-NC 4.0 models retain their noncommercial restriction. Each
+effect displays attribution in its braille frame.
 
 ---
 

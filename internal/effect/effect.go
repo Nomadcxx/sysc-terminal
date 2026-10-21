@@ -99,7 +99,7 @@ func (e *Effect) render() error {
 	if err != nil {
 		return err
 	}
-	g.SmallFooter = e.id == "ak-47" || e.id == "ak-47-text" || e.id == "l2a1-sar"
+	g.SmallFooter = e.id == "ak-47" || e.id == "ak-47-text" || e.id == "l2a1-sar" || isRotatingModel(e.id)
 	e.grid = g
 	e.gen++
 	return nil
@@ -227,7 +227,7 @@ func List() string {
 
 func effectAvailable(id string) bool {
 	switch id {
-	case "ak-47-rama", "justice-cross":
+	case "ak-47-rama", "ansi-love", "justice-cross":
 		return false
 	default:
 		return animations.GetEffectMetadata(id) != nil
@@ -243,7 +243,19 @@ func requiresText(id string) bool {
 	return false
 }
 
+func isRotatingModel(id string) bool {
+	switch id {
+	case "jesus-christ-statue", "jason", "nymphe-der-flora", "lowe", "roman-gladiator", "grabfigur":
+		return true
+	default:
+		return false
+	}
+}
+
 func construct(id, theme string, w, h int, text string) (ticker, error) {
+	if isRotatingModel(id) {
+		return animations.NewRotatingModelEffect(id, w, h, theme)
+	}
 	switch id {
 	case "ak-47-text":
 		return animations.NewAK47TextEffect(w, h, theme, text)
