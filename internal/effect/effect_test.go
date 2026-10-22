@@ -490,7 +490,7 @@ func TestL2A1SARFixedCredit(t *testing.T) {
 	}
 }
 
-func TestRotatingStatuesListConstructAndKeepCredit(t *testing.T) {
+func TestRotatingModelsListConstructAndKeepCredit(t *testing.T) {
 	models := []struct{ id, credit string }{
 		{"jesus-christ-statue", "Jesus Christ Statue / amcgi / CC BY 4.0"},
 		{"jason", "Jason / noe-3d.at / CC BY-NC 4.0"},
@@ -498,6 +498,20 @@ func TestRotatingStatuesListConstructAndKeepCredit(t *testing.T) {
 		{"lowe", "Löwe / noe-3d.at / CC BY-NC 4.0"},
 		{"roman-gladiator", "Sculpture of a Roman gladiator / Virtual Museums of Małopolska / CC BY 4.0"},
 		{"grabfigur", "Grabfigur / noe-3d.at / CC BY-NC 4.0"},
+		{"laocoon-and-his-sons", "Laocoon and His Sons / Rigsters / CC BY 4.0"},
+		{"napoleon-bust", "The bust of Napoleon Bonaparte / Virtual Museums of Małopolska / CC BY 4.0"},
+		{"brandenburg-gate", "Brandenburg Gate / Resinnnn / CC BY 4.0"},
+		{"louis-xiv", "Louis XIV / HoangHiepVu / CC BY 4.0"},
+		{"engel", "Engel / noe-3d.at / CC BY-NC 4.0"},
+		{"st-george", "Hl. Georg als Drachentöter / VIMUNE / CC BY-SA 4.0"},
+		{"santa-muerte", "Santa Muerte / Mateusz Woliński / CC BY-SA 4.0"},
+		{"aspasia", "Aspasia / noe-3d.at / CC BY-NC 4.0"},
+		{"st-nepomuk", "Hl. Nepomuk / noe-3d.at / CC BY-NC 4.0"},
+		{"lion-statue", "Lion Statue / Thomas Flynn / CC0 1.0"},
+		{"f-14-tomcat", "F-14 Tomcat - Fighter Jet - Free / bohmerang / CC BY-NC-SA 4.0"},
+		{"f-15e-strike-eagle", "F-15E Strike Eagle - Fighter Jet - Free / bohmerang / CC BY-NC-SA 4.0"},
+		{"f-22-raptor", "F-22 Raptor - Fighter Jet - Free / bohmerang / CC BY-NC-SA 4.0"},
+		{"fa-18e-super-hornet", "F/A-18E Super Hornet (USA) / 42manako / CC BY-NC 4.0"},
 	}
 	for _, model := range models {
 		t.Run(model.id, func(t *testing.T) {
@@ -513,7 +527,7 @@ func TestRotatingStatuesListConstructAndKeepCredit(t *testing.T) {
 			}
 			g := e.Grid()
 			if !g.SmallFooter {
-				t.Fatal("statue credit not marked for fixed-footer rendering")
+				t.Fatal("rotating model credit not marked for fixed-footer rendering")
 			}
 			var footer strings.Builder
 			for x := 0; x < g.Cols; x++ {

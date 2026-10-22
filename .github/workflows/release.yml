@@ -29,6 +29,7 @@ jobs:
         run: |
           mkdir -p dist
           go build -trimpath -ldflags "-s -w" -o dist/sysc-terminal ./cmd/sysc-terminal
+          cp README.md dist/README.md
           (cd dist && sha256sum * > SHA256SUMS)
 
       - uses: actions/upload-artifact@v4
