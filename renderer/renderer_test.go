@@ -2,10 +2,14 @@ package renderer
 
 import (
 	"bytes"
-	"github.com/Nomadcxx/sysc-terminal/internal/cell"
-	"github.com/Nomadcxx/sysc-terminal/internal/effect"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/Nomadcxx/sysc-Go/animations"
+
+	"github.com/Nomadcxx/sysc-terminal/internal/cell"
+	"github.com/Nomadcxx/sysc-terminal/internal/effect"
 )
 
 func newRenderer(t *testing.T) *Renderer {
@@ -34,6 +38,30 @@ func TestRendererMatchesInternalPipeline(t *testing.T) {
 		}
 	}
 }
+
+func TestRendererUsesRasterCellAspectForMesh(t *testing.T) {
+	r, err := New(Config{Effect: "l2a1-sar", Palette: "nord", Width: 320, Height: 240, PixelSize: 12})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cellWidth, cellHeight := r.raster.CellSize()
+	cols, rows := r.effect.EffectWidth(), r.effect.EffectHeight()
+	wantEffect := animations.NewL2A1SAREffect(cols, rows, "nord")
+	wantEffect.SetCellAspect(cellWidth, cellHeight)
+	wantEffect.Update()
+	want, err := cell.Parse(wantEffect.Render(), cols, rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want.SmallFooter = true
+	if err = r.Step(); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(r.effect.Grid(), want) {
+		t.Fatal("mesh effect did not use the raster cell aspect")
+	}
+}
+
 func TestRendererResizeInvalidatesPreviousFrame(t *testing.T) {
 	r := newRenderer(t)
 	_ = r.Step()

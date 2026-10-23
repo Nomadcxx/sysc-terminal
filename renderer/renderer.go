@@ -116,6 +116,7 @@ func New(cfg Config) (*Renderer, error) {
 	if err != nil {
 		return nil, err
 	}
+	fx.SetCellAspect(cw, ch)
 	return &Renderer{effect: fx, raster: rz, width: cfg.Width, height: cfg.Height, geometry: 1, needsStep: true, textSurface: cfg.Text != ""}, nil
 }
 func geometry(w, h, cw, ch int, textSurface bool) (int, int, error) {
