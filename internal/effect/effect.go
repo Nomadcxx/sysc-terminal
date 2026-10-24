@@ -261,6 +261,8 @@ func construct(id, theme string, w, h int, text string) (ticker, error) {
 	switch id {
 	case "ak-47-text":
 		return animations.NewAK47TextEffect(w, h, theme, text)
+	case "higgs-field":
+		return animations.NewHiggsFieldEffect(w, h, theme), nil
 	case "ak-47":
 		return animations.NewAK47Effect(w, h, theme), nil
 	case "l2a1-sar":

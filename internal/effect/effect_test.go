@@ -490,6 +490,29 @@ func TestL2A1SARFixedCredit(t *testing.T) {
 	}
 }
 
+func TestHiggsFieldLifecycle(t *testing.T) {
+	if !strings.Contains(List(), "effect higgs-field 0\n") {
+		t.Fatal("standalone Higgs field is missing from the shared catalog")
+	}
+	e, err := New("higgs-field", "dracula", 100, 30, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.SetCellAspect(9, 20)
+	if err := e.TickElapsed(0); err != nil {
+		t.Fatal(err)
+	}
+	if e.Grid() == nil || e.Grid().SmallFooter {
+		t.Fatal("standalone field needs a grid without a model attribution footer")
+	}
+	if err := e.TickElapsed(7 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Resize(120, 40); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRotatingModelsListConstructAndKeepCredit(t *testing.T) {
 	models := []struct{ id, credit string }{
 		{"jesus-christ-statue", "Jesus Christ Statue / amcgi / CC BY 4.0"},

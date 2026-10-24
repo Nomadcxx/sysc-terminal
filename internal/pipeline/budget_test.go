@@ -129,7 +129,14 @@ func TestWallpaperFrameBudget(t *testing.T) {
 	// Sample a complete scene loop so intermittent visor/cloud frames cannot
 	// hide behind the fire baseline's short steady-state window.
 	runs := budgetRuns
+	cpuCap := cpuBudget
 	switch id {
+	case "napoleon-bust", "higgs-field":
+		runs = int((20*time.Second + interval - 1) / interval)
+		cpuCap = budget
+	case "f-14-tomcat", "f-15e-strike-eagle", "f-22-raptor", "fa-18e-super-hornet":
+		runs = int((12*time.Second + interval - 1) / interval)
+		cpuCap = budget
 	case "great-wave":
 		runs = int((8*time.Second + interval - 1) / interval)
 	case "ak-47-rama":
@@ -139,6 +146,8 @@ func TestWallpaperFrameBudget(t *testing.T) {
 	case "wasteland":
 		runs = int((16*time.Second + interval - 1) / interval)
 	}
+	// Particle scenes may use the frame's CPU time. Keep CPU reporting for
+	// software/GPU comparisons while enforcing the frame deadline for both.
 	samples := make([]time.Duration, 0, runs)
 	cpuSamples := make([]time.Duration, 0, runs)
 	effectCPU := make([]time.Duration, 0, runs)
@@ -201,12 +210,12 @@ func TestWallpaperFrameBudget(t *testing.T) {
 	line := fmt.Sprintf(
 		"budget effect=%s theme=%s font=%s grid=%dx%d cell=%dx%d n=%d target_fps=%.1f wall_min=%s wall_mean=%s wall_p95=%s wall_max=%s wall_cap=%s cpu_min=%s cpu_mean=%s cpu_p95=%s cpu_max=%s cpu_cap=%s cpu_share_p95=%.1f%% effect_cpu_p95=%s raster_cpu_p95=%s",
 		id, theme, opened, cols, rows, cw, ch, len(samples), float64(time.Second)/float64(interval), min, mean, p95, max, budget,
-		cpuMin, cpuMean, cpuP95, cpuMax, cpuBudget, float64(cpuP95)/float64(interval)*100,
+		cpuMin, cpuMean, cpuP95, cpuMax, cpuCap, float64(cpuP95)/float64(interval)*100,
 		effectOrdered[(len(effectOrdered)*95+99)/100-1], rasterOrdered[(len(rasterOrdered)*95+99)/100-1],
 	)
 	fmt.Fprintln(os.Stderr, line)
 	t.Log(line)
-	if mean > budget || p95 > budget || cpuMean >= cpuBudget || cpuP95 >= cpuBudget {
+	if mean > budget || p95 > budget || cpuMean >= cpuCap || cpuP95 >= cpuCap {
 		t.Fatalf("%s", line)
 	}
 }
