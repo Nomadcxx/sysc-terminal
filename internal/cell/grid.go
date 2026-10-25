@@ -32,6 +32,15 @@ func (g *Grid) At(x, y int) Cell {
 	return g.cells[y*g.Cols+x]
 }
 
+// Row returns the cells of row y so a caller can diff a whole row without a
+// bounds check per cell. The result aliases the grid: read it, never write it.
+func (g *Grid) Row(y int) []Cell {
+	if g == nil || y < 0 || y >= g.Rows {
+		return nil
+	}
+	return g.cells[y*g.Cols : (y+1)*g.Cols]
+}
+
 func newGrid(cols, rows int) *Grid {
 	g := &Grid{Cols: cols, Rows: rows, cells: make([]Cell, cols*rows)}
 	for i := range g.cells {

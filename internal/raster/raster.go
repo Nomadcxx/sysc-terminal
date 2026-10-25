@@ -56,6 +56,11 @@ type Rasterizer struct {
 	faceOf   map[rune]uint8 // resolved face per rune
 	affected map[rune]uint8 // runes that needed a fallback face
 	footer   *Rasterizer
+
+	// Damage scratch buffers. They are reused so that a steady-state frame
+	// computes its damage rectangles without allocating.
+	spansA, spansB []damageSpan
+	idxA, idxB     []int
 }
 
 // rasterFallbackMax bounds the face set (primary + fallbacks);
@@ -270,13 +275,10 @@ func (r *Rasterizer) DrawChanged(g, previous *cell.Grid, dst []byte, width, heig
 }
 
 func (r *Rasterizer) drawSmallFooter(g *cell.Grid, dst []byte, width, height, stride int) error {
-	if r.footer == nil {
-		r.footer = &Rasterizer{font: r.font, fonts: r.fonts, dimOutput: r.dimOutput}
-		if err := r.footer.SetPixelSize(max(1, int(r.ppem)*3/4)); err != nil {
-			return err
-		}
+	f, err := r.footerRasterizer()
+	if err != nil {
+		return err
 	}
-	f := r.footer
 	row := g.Rows - 1
 	start, end := 0, g.Cols
 	for start < end && g.At(start, row).Ch == ' ' {
@@ -297,6 +299,18 @@ func (r *Rasterizer) drawSmallFooter(g *cell.Grid, dst []byte, width, height, st
 		f.drawGlyphCell(g.At(col, row), false, x+(col-start)*f.cellW, y, dst, width, height, stride)
 	}
 	return nil
+}
+
+// footerRasterizer returns the smaller rasterizer that paints the fixed
+// bottom-right credit, creating it on first use.
+func (r *Rasterizer) footerRasterizer() (*Rasterizer, error) {
+	if r.footer == nil {
+		r.footer = &Rasterizer{font: r.font, fonts: r.fonts, dimOutput: r.dimOutput}
+		if err := r.footer.SetPixelSize(max(1, int(r.ppem)*3/4)); err != nil {
+			return nil, err
+		}
+	}
+	return r.footer, nil
 }
 
 func (r *Rasterizer) wide(g *cell.Grid, x, y int) bool {
