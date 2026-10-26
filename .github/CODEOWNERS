@@ -1,0 +1,20 @@
+# The review path per area.
+#
+# There is one owner, so every path below names the same reviewer. The value of this file is the map:
+# which paths belong to which repository, and which of them are cross-repository contracts. A change to
+# a contract needs the repositories that consume it, not only the one that holds it.
+
+# The default owner for everything in this repository.
+/* @Nomadcxx
+
+# The renderer. The shell embeds it in the terminal panel, so a change here is a change
+# to the shell's terminal surface.
+/renderer/ @Nomadcxx
+
+# The protocol bindings the renderer draws through. The repository that owns the
+# Wayland surface is sysc-wayland.
+/protocols/ @Nomadcxx
+
+# The engine itself.
+/internal/ @Nomadcxx
+/cmd/ @Nomadcxx
