@@ -21,7 +21,7 @@ var fontPaths = []string{
 	"/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
 }
 
-func openTestFont(t *testing.T) *Rasterizer {
+func openTestFont(t testing.TB) *Rasterizer {
 	t.Helper()
 	var tried []string
 	for _, p := range fontPaths {
