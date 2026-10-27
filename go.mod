@@ -7,8 +7,8 @@ module github.com/Nomadcxx/sysc-terminal
 go 1.26.10
 
 require (
-	github.com/Nomadcxx/sysc-Go v1.0.10
-	github.com/Nomadcxx/sysc-wayland v0.3.2
+	github.com/Nomadcxx/sysc-Go v1.0.11
+	github.com/Nomadcxx/sysc-wayland v0.3.3
 	github.com/go-text/typesetting v0.3.5
 	github.com/mattn/go-runewidth v0.0.31
 	golang.org/x/image v0.47.0
