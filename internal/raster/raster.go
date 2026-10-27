@@ -263,7 +263,14 @@ func (r *Rasterizer) DrawChanged(g, previous *cell.Grid, dst []byte, width, heig
 				if r.wide(g, x, y) || r.wide(previous, x, y) {
 					clearWidth = 2 * r.cellW
 				}
-				clearOpaqueBlack(dst, stride, dx, dy, clearWidth, r.cellH, width, height)
+				// A continuation marker is the second half of the wide glyph
+				// in the cell before it. That glyph was drawn across both
+				// cells and its own clear covered the marker, so clearing
+				// the marker on its own would erase the half of the glyph
+				// that was just drawn (sysc-2017).
+				if !r.continuationOfRedrawnHead(g, previous, x, y) {
+					clearOpaqueBlack(dst, stride, dx, dy, clearWidth, r.cellH, width, height)
+				}
 			}
 			r.drawCell(g, x, y, c, dst, width, height, stride)
 		}
@@ -315,6 +322,23 @@ func (r *Rasterizer) footerRasterizer() (*Rasterizer, error) {
 
 func (r *Rasterizer) wide(g *cell.Grid, x, y int) bool {
 	return x+1 < g.Cols && g.At(x+1, y).Ch == 0
+}
+
+// continuationOfRedrawnHead reports whether the cell at x is the
+// continuation of a wide glyph whose head sits at x-1 and was redrawn in this
+// pass.
+//
+// The head is drawn across both cells and its clear covered the continuation
+// as well, so the continuation must not be cleared on its own.
+func (r *Rasterizer) continuationOfRedrawnHead(g, previous *cell.Grid, x, y int) bool {
+	if x == 0 || g.At(x, y).Ch != 0 {
+		return false
+	}
+	head := g.At(x-1, y)
+	if head.Ch == 0 {
+		return false
+	}
+	return head != previous.At(x-1, y)
 }
 
 func (r *Rasterizer) drawCell(g *cell.Grid, x, y int, c cell.Cell, dst []byte, width, height, stride int) {
