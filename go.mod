@@ -7,7 +7,7 @@ module github.com/Nomadcxx/sysc-terminal
 go 1.26.10
 
 require (
-	github.com/Nomadcxx/sysc-Go v1.0.11
+	github.com/Nomadcxx/sysc-Go v1.0.12
 	github.com/Nomadcxx/sysc-wayland v0.3.3
 	github.com/go-text/typesetting v0.3.5
 	github.com/mattn/go-runewidth v0.0.31
@@ -16,29 +16,17 @@ require (
 )
 
 require (
-	// hold: the module moved to the charm.land path and the set moves
-	// together (see sysc-2021)
-	github.com/charmbracelet/colorprofile v0.3.2 // indirect
-	// hold: the module moved to the charm.land path and the set moves
-	// together (see sysc-2021)
-	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta.3.0.20250917201909-41ff0bf215ea // indirect
-	// hold: the module moved to the charm.land path and the set moves
-	// together (see sysc-2021)
-	github.com/charmbracelet/ultraviolet v0.0.0-20250915111650-81d4262876ef // indirect
-	// hold: the module moved to the charm.land path and the set moves
-	// together (see sysc-2021)
-	github.com/charmbracelet/x/ansi v0.10.1 // indirect
-	// hold: the module moved to the charm.land path and the set moves
-	// together (see sysc-2021)
-	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
-	// hold: the module moved to the charm.land path and the set moves
-	// together (see sysc-2021)
-	github.com/charmbracelet/x/term v0.2.1 // indirect
-	// hold: the module moved to the charm.land path and the set moves
-	// together (see sysc-2021)
+	charm.land/lipgloss/v2 v2.0.0 // indirect
+	github.com/clipperhouse/displaywidth v0.11.0 // indirect
+)
+
+require (
+	// Keep the Charm dependency set in step with sysc-Go (sysc-2021).
+	github.com/charmbracelet/colorprofile v0.4.2 // indirect
+	github.com/charmbracelet/ultraviolet v0.0.0-20251205161215-1948445e3318 // indirect
+	github.com/charmbracelet/x/ansi v0.11.6 // indirect
+	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
-	// hold: the module moved to the charm.land path and the set moves
-	// together (see sysc-2021)
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
