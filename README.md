@@ -104,6 +104,19 @@ Socket verbs: `query`, `fps [n]`, `pause`, `resume`, `change effect <id> theme <
 - `--list` reports the effect IDs, themes and text effects from the live sysc-Go registry
 - Text effects accept `--file`
 
+### Custom text art
+
+[sysclet v0.3.0 or later](https://github.com/Nomadcxx/sysclet/releases) exports plain-text headers for text effects:
+
+```sh
+sysclet export --format sysc-terminal --font-name Bleach \
+  --output "$HOME/.local/share/sysc-terminal/header" SYSC
+sysc-terminal --output eDP-1 --effect beam-text --theme nord \
+  --file "$HOME/.local/share/sysc-terminal/header.txt"
+```
+
+sysclet adds the `.txt` extension. Its output path must be under `~/.local/share` or `~/.config`.
+
 ## Build
 
 Pins Go 1.26, sysc-Go `v1.0.9-0.20261022010724-1fa198051d89` and sysc-wayland `v0.3.1`. Niri
