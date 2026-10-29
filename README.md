@@ -44,21 +44,6 @@ palette, and apply it to an output.
 `--effect ak-47-text --file /path/to/art.txt`; it follows the same 14-second
 loop. The file must contain literal UTF-8 artwork within 64 KiB.
 
-### Custom artwork
-
-Text effects (`--list` marks them with `1`) read artwork from `--file`. The
-path must be absolute and resolve under `~/.config`, `~/.local/share`,
-`/usr/share` or `/usr/local/share`.
-[sysclet](https://github.com/Nomadcxx/sysclet) renders text with TheDraw
-fonts into such a file:
-
-```bash
-sysclet export --font-name Bleach --format sysc-terminal --output niri NIRI
-```
-
-It writes `~/.local/share/syscgo/walls/niri.txt` and prints the full
-`sysc-terminal --effect beam-text --file` command for it.
-
 ### Australian L2A1 SAR
 
 `l2a1-sar` rotates the braille model twice, then swirls and reconstructs it.
@@ -130,7 +115,12 @@ sysc-terminal --output eDP-1 --effect beam-text --theme nord \
   --file "$HOME/.local/share/sysc-terminal/header.txt"
 ```
 
-sysclet adds the `.txt` extension. Its output path must be under `~/.local/share` or `~/.config`.
+sysclet adds the `.txt` extension. Its output path must be under `~/.local/share` or `~/.config`; a bare
+name such as `header` writes `~/.local/share/syscgo/walls/header.txt`, and sysclet prints the
+`sysc-terminal --effect beam-text --file` command for the file it wrote.
+
+sysc-terminal reads `--file` only from an absolute path that resolves under `~/.config`,
+`~/.local/share`, `/usr/share` or `/usr/local/share`. `--list` marks text effects with `1`.
 
 ## Build
 
