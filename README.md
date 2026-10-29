@@ -44,6 +44,21 @@ palette, and apply it to an output.
 `--effect ak-47-text --file /path/to/art.txt`; it follows the same 14-second
 loop. The file must contain literal UTF-8 artwork within 64 KiB.
 
+### Custom artwork
+
+Text effects (`--list` marks them with `1`) read artwork from `--file`. The
+path must be absolute and resolve under `~/.config`, `~/.local/share`,
+`/usr/share` or `/usr/local/share`.
+[sysclet](https://github.com/Nomadcxx/sysclet) renders text with TheDraw
+fonts into such a file:
+
+```bash
+sysclet export --font-name Bleach --format sysc-terminal --output niri NIRI
+```
+
+It writes `~/.local/share/syscgo/walls/niri.txt` and prints the full
+`sysc-terminal --effect beam-text --file` command for it.
+
 ### Australian L2A1 SAR
 
 `l2a1-sar` rotates the braille model twice, then swirls and reconstructs it.
